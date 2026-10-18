@@ -213,6 +213,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .pips i.on { background: #c2a6ff; }
 .scard .ds { font-size: 12px; color: var(--muted); line-height: 1.4; margin: 3px 0 8px; }
 .scard .ds b { color: var(--text); font-weight: 500; }
+.scard.paint { grid-column: 1 / -1; border-color: #4a3f63; background: linear-gradient(90deg, rgba(229,72,77,.08), rgba(245,211,61,.06), rgba(76,194,107,.06), rgba(61,139,240,.07), rgba(155,93,229,.09)), var(--panel); }
+.pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.gcard .act { flex-wrap: wrap; align-items: center; gap: 6px; }
+.swatches { display: inline-flex; gap: 3px; }
+.sw { width: 21px; height: 21px; border-radius: 50%; border: 2px solid rgba(0,0,0,.35); background: var(--sw); color: rgba(0,0,0,.6); font: 700 10px/1 var(--f-body); cursor: pointer; padding: 0; }
+.sw:hover { transform: scale(1.1); }
+.sw.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text); }
+.sw:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 .passives { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
 .passives b { color: #c2a6ff; font-weight: 500; }
 .maps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 8px; }
@@ -220,7 +228,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .mcard canvas { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 4px; display: block; }
 .mname { font-weight: 700; }
 .mcard .kv { font-size: 12px; }
-.garage { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.garage { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px; }
 .gcard { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
 .gcard canvas { width: 44px; height: 44px; }
 .gcard.locked canvas { opacity: .35; filter: grayscale(1); }
@@ -424,7 +432,7 @@ function loadProg() {
   let p = null;
   try { p = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
   p = p && typeof p === 'object' ? p : {};
-  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, cleared: p.cleared && typeof p.cleared === 'object' ? p.cleared : {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {} };
+  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, cleared: p.cleared && typeof p.cleared === 'object' ? p.cleared : {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {}, paint: p.paint && typeof p.paint === 'object' ? p.paint : {}, paintTokens: p.paintTokens | 0 };
 }
 const prog = loadProg();
 // 금광이 삭제되었으므로, 이미 해제한 사람에게는 해제 비용 20 AP를 돌려줍니다.
@@ -628,7 +636,29 @@ function drawVehicle(g, type, off) {
   }
 }
 // towers are weapons drawn top-down; rotating ones face +x
-function drawWeapon(g, type, ang, t) {
+// 무기 색 바꾸기: 패시브 상점에서 200 AP로 사면 보유 무기 하나에 일곱 색 중 하나를 칠할 수 있습니다.
+const PAINT_COST = 200;
+const PAINTS = [
+  { id: 'red',    name: '빨강', hex: '#e5484d' },
+  { id: 'orange', name: '주황', hex: '#f2873a' },
+  { id: 'yellow', name: '노랑', hex: '#f5d33d' },
+  { id: 'green',  name: '초록', hex: '#4cc26b' },
+  { id: 'blue',   name: '파랑', hex: '#3d8bf0' },
+  { id: 'indigo', name: '남색', hex: '#3b4bb8' },
+  { id: 'violet', name: '보라', hex: '#9b5de5' },
+];
+const paintOf = type => { const id = prog.paint[type]; return id ? PAINTS.find(c => c.id === id) : null; };
+const paintCv = document.createElement('canvas'); paintCv.width = paintCv.height = 160;
+function drawWeaponPainted(g, type, ang, t, hex) {
+  const o = paintCv.getContext('2d');
+  o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.globalAlpha = 1; o.clearRect(0, 0, 160, 160);
+  o.setTransform(2.5, 0, 0, 2.5, 80, 80); drawWeapon(o, type, ang, t, true);
+  o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-atop'; o.globalAlpha = .6; o.fillStyle = hex; o.fillRect(0, 0, 160, 160);
+  o.globalCompositeOperation = 'source-over'; o.globalAlpha = 1;
+  if (type !== 'flume') { g.save(); g.rotate(ang); g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(3, 4, 19, 13, 0, 0, Math.PI * 2); g.fill(); g.restore(); }
+  g.drawImage(paintCv, -32, -32, 64, 64);
+}
+function drawWeapon(g, type, ang, t, noShadow) {
   const d = TOWERS[type];
   if (type === 'flume') { // 빙결총: 천천히 도는 눈꽃 방출기
     g.fillStyle = '#18323f'; g.strokeStyle = '#0c1d26'; g.lineWidth = 2;
@@ -648,7 +678,7 @@ function drawWeapon(g, type, ang, t) {
   let off = 0;
   if (type === 'bumper' && t && t.bump > 0) off = Math.sin(t.bump / .18 * Math.PI) * 7;
   g.rotate(ang);
-  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(3, 4, 19, 13, 0, 0, Math.PI * 2); g.fill();
+  if (!noShadow) { g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(3, 4, 19, 13, 0, 0, Math.PI * 2); g.fill(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
   if (type === 'police' || type === 'tank') { // 새총 · 강력 새총
     const big = type === 'tank', s = big ? 1.25 : 1;
@@ -723,7 +753,8 @@ function drawTower(g, type, x, y, lv, ang, t) {
   g.beginPath(); for (const [cx, cy, dx, dy] of [[-22, -22, 1, 1], [22, -22, -1, 1], [-22, 22, 1, -1], [22, 22, -1, -1]]) { g.moveTo(cx + dx * 7, cy); g.lineTo(cx, cy); g.lineTo(cx, cy + dy * 7); } g.stroke();
 
   g.save();
-  drawWeapon(g, type, ang, t);
+  const pc = paintOf(type);
+  if (pc) drawWeaponPainted(g, type, ang, t, pc.hex); else drawWeapon(g, type, ang, t);
   g.restore();
   g.fillStyle = '#e2b54a';
   for (let i = 0; i < lv; i++) { circle(g, -(lv - 1) * 4 + i * 8, 22, 2.4); g.fill(); }
@@ -1113,12 +1144,16 @@ function render() {
 // ---------- UI ----------
 const $ = id => document.getElementById(id);
 const shop = $('shop');
+function drawShopIcon(b, type) {
+  const cv2 = b.querySelector('canvas'), g = cv2.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv2.width, cv2.height); g.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(g, type, 30, 32, 1, -.7);
+}
 for (const [i, type] of ORDER.entries()) {
   const d = TOWERS[type];
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'tcard'; b.dataset.type = type; b.setAttribute('aria-pressed', 'false');
   b.innerHTML = `<canvas width="96" height="96" aria-hidden="true"></canvas><div><div class="nm">${d.name}</div><div class="meta"><span class="cost">${d.cost}</span><span>${(i + 1) % 10}</span></div></div>`;
-  const g = b.querySelector('canvas').getContext('2d'); g.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(g, type, 30, 32, 1, -.7);
+  drawShopIcon(b, type);
   b.addEventListener('click', () => toggleBuild(type));
   shop.appendChild(b);
   b.dataset.cost = d.cost;
@@ -1246,6 +1281,7 @@ function showLobby() {
   $('lobby').hidden = false; renderLobby();
 }
 function startGame(i) {
+  for (const b of $('shop').children) drawShopIcon(b, b.dataset.type);
   reset(i); panelKey = ''; inLobby = false;
   document.querySelector('.app').classList.remove('in-lobby');
   $('lobby').hidden = true;
@@ -1262,7 +1298,21 @@ function renderSkills() {
       <div class="ds">${lv ? `지금: <b>${k.fmt(lv * k.per)}</b>` : '아직 배우지 않음'}${maxed ? '' : `<br>다음 단계: ${k.fmt((lv + 1) * k.per)}`}</div>
       ${maxed ? '<span class="owned">최대 단계</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-skill="${k.id}" ${can ? '' : 'disabled'}>${cost} AP로 ${lv + 1}단계</button>`}
     </div></div>`;
-  }).join('');
+  }).join('') + paintCard();
+}
+function paintCard() {
+  const owned = ORDER.filter(isUnlocked), slots = owned.filter(t => t in prog.paint), free = owned.filter(t => !(t in prog.paint));
+  const can = prog.ap >= PAINT_COST && free.length > 0;
+  let body;
+  if (prog.paintTokens > 0) {
+    body = `<div class="ds"><b>색을 바꿀 무기를 하나 고르세요.</b> 고른 무기는 무기고의 "보유" 옆에 색 버튼이 생깁니다.</div>
+      <div class="pick">${free.map(t => `<button class="btn sm" type="button" data-paintpick="${t}">${TOWERS[t].name}</button>`).join('') || '<span class="owned">고를 수 있는 무기가 없습니다</span>'}</div>`;
+  } else {
+    body = `<div class="ds">200 AP로 사면 보유한 무기 하나를 골라 빨·주·노·초·파·남·보 중 원하는 색으로 칠할 수 있습니다. 여러 번 사서 무기마다 열 수 있습니다.${slots.length ? `<br>색을 바꿀 수 있는 무기: <b>${slots.map(t => TOWERS[t].name).join(', ')}</b>` : ''}</div>
+      ${free.length ? `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-paintbuy ${can ? '' : 'disabled'}>${PAINT_COST} AP로 구매</button>` : '<span class="owned">보유한 무기 모두 열림</span>'}`;
+  }
+  return `<div class="scard paint"><div class="ic" aria-hidden="true">🎨</div><div>
+    <div class="nm"><span>무기 색 바꾸기</span><span class="dlv">${PAINT_COST} AP</span></div>${body}</div></div>`;
 }
 function renderMaps() {
   const box = $('maps'); box.innerHTML = '';
@@ -1294,19 +1344,24 @@ function renderLobby() {
     const d = TOWERS[type], own = isUnlocked(type);
     const c = document.createElement('div'); c.className = 'gcard' + (own ? '' : ' locked');
     c.innerHTML = `<canvas width="96" height="96" aria-hidden="true"></canvas><div><div class="nm">${d.name} <span class="dlv">${d.cost} 금화</span></div><div class="ds">${d.desc}</div><div class="act">` +
-      (own ? '<span class="owned">보유</span>' : `<button class="btn sm ${prog.ap >= d.ap ? 'primary' : ''}" type="button" data-unlock="${type}" ${prog.ap >= d.ap ? '' : 'disabled'}>🔒 ${d.ap} AP로 해제</button>`) + '</div></div>';
+      (own ? '<span class="owned">보유</span>' + (type in prog.paint ? `<span class="swatches" role="group" aria-label="${d.name} 색">${PAINTS.map(c => `<button type="button" class="sw${prog.paint[type] === c.id ? ' on' : ''}" style="--sw:${c.hex}" data-paint="${type}" data-color="${c.id}" aria-label="${c.name}" aria-pressed="${prog.paint[type] === c.id}" title="${c.name}${prog.paint[type] === c.id ? ' · 다시 누르면 원래 색' : ''}">${c.name[0]}</button>`).join('')}</span>` : '') : `<button class="btn sm ${prog.ap >= d.ap ? 'primary' : ''}" type="button" data-unlock="${type}" ${prog.ap >= d.ap ? '' : 'disabled'}>🔒 ${d.ap} AP로 해제</button>`) + '</div></div>';
     const cx = c.querySelector('canvas').getContext('2d'); cx.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(cx, type, 30, 32, 1, -.7);
     g.appendChild(c);
   }
 }
 $('diffs').addEventListener('click', e => { const b = e.target.closest('[data-diff]'); if (b) startGame(+b.dataset.diff); });
 $('skills').addEventListener('click', e => {
+  const buy = e.target.closest('[data-paintbuy]'), pick = e.target.closest('[data-paintpick]');
+  if (buy) { if (prog.ap < PAINT_COST) return; prog.ap -= PAINT_COST; prog.paintTokens++; saveProg(); renderLobby(); return; }
+  if (pick) { const t = pick.dataset.paintpick; if (prog.paintTokens < 1 || t in prog.paint || !isUnlocked(t)) return; prog.paintTokens--; prog.paint[t] = null; saveProg(); renderLobby(); return; }
   const b = e.target.closest('[data-skill]'); if (!b) return;
   const k = SKILLS.find(x => x.id === b.dataset.skill), lv = skillLv(k.id), cost = k.base * (lv + 1);
   if (lv >= k.max || prog.ap < cost) return;
   prog.ap -= cost; prog.skills[k.id] = lv + 1; saveProg(); renderLobby();
 });
 $('garage').addEventListener('click', e => {
+  const sw = e.target.closest('[data-paint]');
+  if (sw) { const t = sw.dataset.paint; if (!(t in prog.paint)) return; prog.paint[t] = prog.paint[t] === sw.dataset.color ? null : sw.dataset.color; saveProg(); renderLobby(); return; }
   const b = e.target.closest('[data-unlock]'); if (!b) return;
   const type = b.dataset.unlock, cost = TOWERS[type].ap;
   if (isUnlocked(type) || prog.ap < cost) return;
