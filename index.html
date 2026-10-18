@@ -410,10 +410,10 @@ const TOWERS = {
   crane:  { name: '대형 대포',  ap: 30, cost: 120, range: 2.0, dmg: 90, rate: 2.4, splash: .6, color: '#c98a4a', desc: '무거운 포탄을 쏩니다. 느리지만 한 방이 아주 셉니다.' },
   flume:  { name: '빙결총',     ap: 40, cost: 130, range: 1.9, dmg: 18, rate: 1.3, pulse: true, freeze: .5, color: '#86d0ee', desc: '냉기를 뿜어 범위 안의 적 모두를 잠깐 얼려 멈춰 세웁니다.' },
   tank:   { name: '강력 새총',  ap: 60, cost: 160, range: 3.6, dmg: 70, rate: 1.6, color: '#e2b54a', desc: '사거리가 가장 깁니다. 멀리서 큰 돌을 세게 날립니다.' },
-  // 비밀탱크: 능력치 미정. 아래 수치는 임시 값입니다.
-  secret1: { name: '비밀탱크1', ap: 80,  cost: 140, range: 3.0, dmg: 45,  rate: 1.0, color: '#a5d46a', secret: true, desc: '정체를 알 수 없는 비밀 탱크. 포탄 한 발씩 쏩니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
-  secret2: { name: '비밀탱크2', ap: 120, cost: 180, range: 2.8, dmg: 40,  rate: 1.4, splash: .8, color: '#d9b46a', secret: true, desc: '포신이 두 개인 비밀 탱크. 범위 포격을 합니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
-  secret3: { name: '비밀탱크3', ap: 160, cost: 240, range: 3.4, dmg: 150, rate: 2.0, splash: 1.0, color: '#b79cff', secret: true, desc: '가장 큰 포를 단 비밀 탱크. 무거운 범위 포격을 합니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
+  // 비밀 무기: 해금 전에는 그림이 물음표로 보입니다. 능력치 미정, 아래 수치는 임시 값입니다.
+  secret1: { name: '비행기', ap: 80,  cost: 140, range: 3.0, dmg: 45,  rate: 1.0, color: '#7fb2e5', secret: true, desc: '하늘에서 날아와 적 한 대를 정확히 쏩니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
+  secret2: { name: '불', ap: 120, cost: 180, range: 2.8, dmg: 40,  rate: 1.4, splash: .8, color: '#ff7a2f', secret: true, desc: '활활 타는 불덩이를 던져 떨어진 자리 주변을 태웁니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
+  secret3: { name: '웅덩이', ap: 160, cost: 240, range: 3.4, dmg: 150, rate: 2.0, splash: 1.0, color: '#3f8fd0', secret: true, desc: '물웅덩이에서 커다란 물폭탄을 쏘아 올려 넓게 덮칩니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
 };
 const DIFF_STEP = 1.2;
 const DIFFS = [
@@ -660,6 +660,37 @@ function drawWeaponPainted(g, type, ang, t, hex) {
 }
 function drawWeapon(g, type, ang, t, noShadow) {
   const d = TOWERS[type];
+  if (type === 'secret2') { // 불: 돌로 두른 모닥불, 혀처럼 일렁이는 불꽃
+    g.fillStyle = '#4a4540'; g.strokeStyle = '#211d1a'; g.lineWidth = 1.5; circle(g, 0, 0, 18); g.fill(); g.stroke();
+    g.fillStyle = '#5f5852'; for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; circle(g, Math.cos(a) * 15, Math.sin(a) * 15, 3.4); g.fill(); }
+    g.fillStyle = '#1d1410'; circle(g, 0, 0, 11.5); g.fill();
+    g.fillStyle = '#6b4526'; g.save(); g.rotate(.6); g.fillRect(-11, -2.5, 22, 5); g.rotate(-1.2); g.fillRect(-11, -2.5, 22, 5); g.restore();
+    g.shadowColor = d.color; g.shadowBlur = 12;
+    for (const [col, sc] of [[d.color, 1], ['#ffd24a', .62]]) {
+      g.fillStyle = col; g.beginPath();
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * Math.PI * 2 + time * .7, len = (10 + Math.sin(time * 9 + k * 1.7) * 3) * sc, w = .55;
+        g.moveTo(Math.cos(a - w) * 3 * sc, Math.sin(a - w) * 3 * sc);
+        g.quadraticCurveTo(Math.cos(a) * len * .6 + Math.cos(a + 1.2) * 3, Math.sin(a) * len * .6 + Math.sin(a + 1.2) * 3, Math.cos(a) * len, Math.sin(a) * len);
+        g.quadraticCurveTo(Math.cos(a) * len * .6 + Math.cos(a - 1.2) * 3, Math.sin(a) * len * .6 + Math.sin(a - 1.2) * 3, Math.cos(a + w) * 3 * sc, Math.sin(a + w) * 3 * sc);
+      }
+      g.fill();
+    }
+    g.fillStyle = '#fff1c2'; circle(g, 0, 0, 3.5); g.fill(); g.shadowBlur = 0;
+    return;
+  }
+  if (type === 'secret3') { // 웅덩이: 물결이 퍼지는 물웅덩이
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(2, 3, 21, 16, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2b5f88'; g.strokeStyle = '#173a57'; g.lineWidth = 1.6; g.beginPath(); g.ellipse(0, 0, 20, 15.5, .15, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = d.color; g.beginPath(); g.ellipse(-1, -1, 15, 11, .15, 0, Math.PI * 2); g.fill();
+    for (let k = 0; k < 2; k++) {
+      const ph = (time * .6 + k * .5) % 1;
+      g.strokeStyle = `rgba(220,240,255,${.6 * (1 - ph)})`; g.lineWidth = 1.3; g.beginPath(); g.ellipse(1, 1, 3 + ph * 12, 2.2 + ph * 9, .15, 0, Math.PI * 2); g.stroke();
+    }
+    g.fillStyle = 'rgba(255,255,255,.45)'; g.beginPath(); g.ellipse(-8, -6, 4, 1.8, -.4, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#6d6a63'; circle(g, 17, 10, 2.6); g.fill(); circle(g, -18, 9, 2); g.fill(); circle(g, 14, -12, 1.8); g.fill();
+    return;
+  }
   if (type === 'flume') { // 빙결총: 천천히 도는 눈꽃 방출기
     g.fillStyle = '#18323f'; g.strokeStyle = '#0c1d26'; g.lineWidth = 2;
     g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; g.lineTo(Math.cos(a) * 18, Math.sin(a) * 18); } g.closePath(); g.fill(); g.stroke();
@@ -719,19 +750,16 @@ function drawWeapon(g, type, ang, t, noShadow) {
     rr(g, L - 10, -Wd / 2 - 2, 5, Wd + 4, 2); g.fill();
     g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(-4, -Wd / 2 + 2, L - 8, 2);
     if (big) { g.fillStyle = '#e2b54a'; for (const rx of [-3, 8]) { circle(g, rx, -Wd / 2 + 3, 1.3); g.fill(); circle(g, rx, Wd / 2 - 3, 1.3); g.fill(); } }
-  } else if (d.secret) { // 비밀탱크 1·2·3: 위장 무늬 탱크, 포탑 위에 번호
-    const n = +type.slice(-1), camo = { 1: ['#4f6b3a', '#3a5229', '#6f8a52'], 2: ['#b8955a', '#8f7040', '#d2b27a'], 3: ['#3a3350', '#28233a', '#5a4f7a'] }[n];
-    g.fillStyle = '#1e1f1a'; rr(g, -19, -15, 38, 7, 2); g.fill(); rr(g, -19, 8, 38, 7, 2); g.fill();
-    g.strokeStyle = '#45473a'; g.lineWidth = 1; g.beginPath(); for (let i = -17; i < 19; i += 4) { g.moveTo(i, -15); g.lineTo(i, -8); g.moveTo(i, 8); g.lineTo(i, 15); } g.stroke();
-    g.fillStyle = camo[0]; g.strokeStyle = '#121212'; g.lineWidth = 1.5; rr(g, -17, -9, 34, 18, 4); g.fill(); g.stroke();
-    g.fillStyle = camo[1]; for (const [ex, ey, rx, ry] of [[-12, -5, 6, 3.5], [3, 4, 7, 3.5], [10, -6, 4, 2.5]]) { g.beginPath(); g.ellipse(ex, ey, rx, ry, .3, 0, Math.PI * 2); g.fill(); }
-    g.fillStyle = camo[2]; g.beginPath(); g.ellipse(-5, 5, 4.5, 2.2, -.4, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#2a2b26'; g.strokeStyle = '#121212'; g.lineWidth = 1.2;
-    if (n === 2) { rr(g, 2, -6, 22, 4, 1.5); g.fill(); g.stroke(); rr(g, 2, 2, 22, 4, 1.5); g.fill(); g.stroke(); }
-    else if (n === 3) { rr(g, 2, -4, 27, 8, 3); g.fill(); g.stroke(); g.fillStyle = '#3d3e38'; rr(g, 24, -5.5, 6, 11, 2); g.fill(); }
-    else { rr(g, 2, -2.5, 22, 5, 2); g.fill(); g.stroke(); }
-    g.fillStyle = camo[1]; g.strokeStyle = '#121212'; g.lineWidth = 1.5; circle(g, -1, 0, n === 3 ? 10 : 8.5); g.fill(); g.stroke();
-    g.save(); g.translate(-1, 0); g.rotate(-ang); g.fillStyle = d.color; g.font = '700 12px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 0, .5); g.restore();
+  } else if (type === 'secret1') { // 비행기: 위에서 본 프로펠러 비행기
+    g.fillStyle = '#4f7fae'; g.strokeStyle = '#16263a'; g.lineWidth = 1.4;
+    rr(g, -5, -21, 11, 42, 4); g.fill(); g.stroke();
+    rr(g, -18, -8, 6, 16, 2); g.fill(); g.stroke();
+    g.fillStyle = d.color; g.beginPath(); g.ellipse(0, 0, 19, 5.5, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#26394a'; g.beginPath(); g.ellipse(8, 0, 4.2, 2.8, 0, 0, Math.PI * 2); g.fill();
+    for (const wy of [-15, 15]) { g.fillStyle = '#f5f0e0'; circle(g, 0.5, wy, 3.2); g.fill(); g.fillStyle = '#e65a4f'; circle(g, 0.5, wy, 1.6); g.fill(); }
+    g.fillStyle = 'rgba(235,240,245,.22)'; circle(g, 20, 0, 7.5); g.fill();
+    g.save(); g.translate(20, 0); g.rotate(time * 40); g.strokeStyle = '#2b2b2b'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(0, -7); g.lineTo(0, 7); g.stroke(); g.restore();
+    g.fillStyle = '#e2b54a'; circle(g, 20, 0, 2); g.fill();
   } else if (type === 'bumper') { // 빽 총: 용수철로 뻥 밀어내는 나팔 총
     g.translate(off, 0);
     g.fillStyle = '#3a3f44'; g.strokeStyle = '#141414'; g.lineWidth = 1.5; rr(g, -15, -7, 20, 14, 4); g.fill(); g.stroke();
@@ -754,7 +782,10 @@ function drawTower(g, type, x, y, lv, ang, t) {
 
   g.save();
   const pc = paintOf(type);
-  if (pc) drawWeaponPainted(g, type, ang, t, pc.hex); else drawWeapon(g, type, ang, t);
+  if (d.secret && !isUnlocked(type)) {
+    g.fillStyle = '#1f2a25'; circle(g, 0, 0, 17); g.fill(); g.strokeStyle = '#4a5a52'; g.lineWidth = 1.5; g.setLineDash([3, 3]); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#c2a6ff'; g.font = '700 26px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 0, 1); g.textBaseline = 'alphabetic';
+  } else if (pc) drawWeaponPainted(g, type, ang, t, pc.hex); else drawWeapon(g, type, ang, t);
   g.restore();
   g.fillStyle = '#e2b54a';
   for (let i = 0; i < lv; i++) { circle(g, -(lv - 1) * 4 + i * 8, 22, 2.4); g.fill(); }
@@ -951,12 +982,12 @@ function fire(t, e, st) {
     S.proj.push({ k, x: nx, y: ny, tg: e, tx: e.x, ty: e.y, sp, dmg: st.dmg, slow: st.slow, slowDur: st.slowDur, src: t, ang: t.ang });
     if (t.type === 'tank' || t.type === 'secret1') ring(nx, ny, 3, 14, '#e2b54a', .18);
   } else if (t.type === 'dump' || t.type === 'crane' || t.type === 'secret2' || t.type === 'secret3') {
-    const crane = t.type === 'crane' || t.type === 'secret3';
+    const crane = t.type === 'crane';
     const dist = Math.hypot(e.x - t.x, e.y - t.y), dur = crane ? .45 : Math.max(.3, dist / 340);
     const sp = espeed(e);
     const p = posAt(e.d + sp * dur);
-    const mz = crane ? 30 : 20, sx = t.x + Math.cos(t.ang) * mz, sy = t.y + Math.sin(t.ang) * mz;
-    S.proj.push({ k: crane ? 'wreck' : 'rock', sx, sy, tx: p.x, ty: p.y, x: sx, y: sy, t: 0, dur, arc: crane ? 26 : 46, dmg: st.dmg, splash: st.splash, src: t });
+    const mz = { crane: 30, dump: 20 }[t.type] || 0, sx = t.x + Math.cos(t.ang) * mz, sy = t.y + Math.sin(t.ang) * mz;
+    S.proj.push({ k: { dump: 'rock', crane: 'wreck', secret2: 'fireball', secret3: 'blob' }[t.type], sx, sy, tx: p.x, ty: p.y, x: sx, y: sy, t: 0, dur, arc: { dump: 46, crane: 26, secret2: 34, secret3: 48 }[t.type], dmg: st.dmg, splash: st.splash, src: t });
   } else if (t.type === 'bumper') {
     hurt(e, st.dmg, t); t.bump = .18;
     if (e.alive) { e.d = Math.max(0, e.d - st.knock * knockFactor(e)); const p = posAt(e.d); e.x = p.x; e.y = p.y; }
@@ -975,6 +1006,7 @@ function fire(t, e, st) {
 const KNOCK_REF_HP = 42;
 const knockFactorOf = baseHp => Math.max(.15, Math.min(1.5, Math.sqrt(KNOCK_REF_HP / baseHp)));
 const knockFactor = e => knockFactorOf(e.maxHp / (e.hpScale || 1));
+const ARC_KINDS = new Set(['rock', 'wreck', 'fireball', 'blob']);
 const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1) * dmult(S.diff) * (1 - skillVal('slow') / 100);
 function update(dt) {
   for (const f of S.fx) { f.life -= dt; if (f.k === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } if (f.k === 'text') f.y -= 26 * dt; }
@@ -1007,13 +1039,14 @@ function update(dt) {
     }
   }
   for (const p of S.proj) {
-    if (p.k === 'rock' || p.k === 'wreck') {
+    if (ARC_KINDS.has(p.k)) {
       p.t += dt; const k = Math.min(1, p.t / p.dur);
       p.x = p.sx + (p.tx - p.sx) * k; p.y = p.sy + (p.ty - p.sy) * k; p.h = Math.sin(Math.PI * k) * p.arc;
       if (k >= 1) {
         p.dead = true;
         for (const e of S.enemies) { if (!e.alive) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d <= p.splash) hurt(e, p.dmg * (1 - .4 * d / p.splash), p.src); }
-        ring(p.x, p.y, 6, p.splash, p.k === 'rock' ? '#c9a46b' : '#d7dde0', .35); sparks(p.x, p.y, '#b08a5a', 6);
+        const ic = { rock: ['#c9a46b', '#b08a5a'], wreck: ['#d7dde0', '#b08a5a'], fireball: ['#ff7a2f', '#ffc04a'], blob: ['#8fd0f5', '#cfeeff'] }[p.k];
+        ring(p.x, p.y, 6, p.splash, ic[0], .35); sparks(p.x, p.y, ic[1], 8);
       }
     } else {
       if (p.tg.alive) { p.tx = p.tg.x; p.ty = p.tg.y; }
@@ -1098,10 +1131,16 @@ function render() {
       else if (p.k === 'drop') { ctx.fillStyle = 'rgba(155,214,90,.45)'; ctx.beginPath(); ctx.ellipse(-6, 0, 8, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b5ec78'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 4, 0, 0, Math.PI * 2); ctx.fill(); }
       else { ctx.strokeStyle = 'rgba(235,230,211,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(-5, 0); ctx.stroke(); ctx.fillStyle = '#a39c90'; ctx.strokeStyle = '#3f3a33'; ctx.lineWidth = 1.2; circle(ctx, 0, 0, 5); ctx.fill(); ctx.stroke(); }
       ctx.restore();
-    } else if (p.k === 'rock' || p.k === 'wreck') {
+    } else if (ARC_KINDS.has(p.k)) {
       const hy = p.y - (p.h || 0);
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
-      if (p.k === 'wreck') {
+      if (p.k === 'fireball') {
+        ctx.save(); ctx.shadowColor = '#ff7a2f'; ctx.shadowBlur = 12; ctx.fillStyle = '#ff7a2f'; circle(ctx, p.x, hy, 6); ctx.fill();
+        ctx.fillStyle = '#ffd24a'; circle(ctx, p.x, hy, 3.5); ctx.fill(); ctx.restore();
+      } else if (p.k === 'blob') {
+        ctx.fillStyle = '#3f8fd0'; circle(ctx, p.x, hy, 7.5); ctx.fill();
+        ctx.fillStyle = 'rgba(220,240,255,.7)'; circle(ctx, p.x - 2.5, hy - 2.5, 2.4); ctx.fill();
+      } else if (p.k === 'wreck') {
         ctx.fillStyle = '#34383b'; circle(ctx, p.x, hy, 8); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,.25)'; circle(ctx, p.x - 3, hy - 3, 2.5); ctx.fill();
       } else {
@@ -1169,6 +1208,7 @@ function unlockVehicle(type) {
   const cost = TOWERS[type].ap;
   if (isUnlocked(type) || prog.ap < cost) return false;
   prog.ap -= cost; prog.unlocked.push(type); saveProg();
+  const card = [...$('shop').children].find(x => x.dataset.type === type); if (card) drawShopIcon(card, type);
   return true;
 }
 
@@ -1476,12 +1516,12 @@ const PERSONA = {
     me: '차가운 냉기를 뿜어서 적을 잠깐 얼려 세우는 빙결총이에요', food: '빙수랑 아이스크림이요 🍨', hobby: '눈꽃 모양 만들기', dream: '여름에도 녹지 않는 거요', age: '빙하기 때부터… 는 농담이에요 ㅎㅎ' },
   tank: { hi: ['강력 새총, 조준 완료. 🎯', '멀리 있는 적도 맞힙니다.'],
     me: '쇠로 만든 거대한 새총입니다. 사거리가 가장 깁니다', food: '든든한 고기요. 힘을 써야 하니까', hobby: '고무줄 당기기 운동', dream: '하늘 끝까지 돌 날려 보기', age: '작은 새총 시절은 기억도 안 나요' },
-  secret1: { hi: ['…비밀탱크1, 위치 확보. 🤫', '정체는 비밀입니다. 대화는… 조금만 할게요.'],
-    me: '저는 비밀탱크1. 그 이상은 기밀입니다', food: '기밀입니다. …사실 김밥 좋아해요', hobby: '몰래 숨어 있기', dream: '언젠가 정체를 밝히는 날', age: '기밀 사항입니다' },
-  secret2: { hi: ['비밀탱크2 출격! 쌍포 준비 완료.', '포신이 두 개라서 말도 두 배로 해요 ㅎㅎ'],
-    me: '포신이 두 개인 비밀탱크2예요. 자세한 건 비밀!', food: '짜장면 곱빼기요. 포신이 둘이니까 🍜', hobby: '포신 두 개 동시에 닦기', dream: '세 번째 포신 달기', age: '쌍둥이 동생은 없어요' },
-  secret3: { hi: ['비밀탱크3… 기동.', '가장 무겁고, 가장 조용합니다.'],
-    me: '가장 큰 포를 단 비밀탱크3입니다. 나머지는 극비', food: '무거운 걸 먹어야 무거워지죠. 갈비요', hobby: '밤하늘 보며 조용히 대기하기', dream: '모든 비밀이 풀리는 날', age: '세 번째지만 맏형입니다' },
+  secret1: { hi: ['비행기 이륙 완료! ✈️', '하늘에서 다 보여요. 궁금한 거 있으면 무전 주세요.'],
+    me: '프로펠러로 날아다니는 비행기예요. 위에서 정확히 쏘죠', food: '기내식이요! 은근 맛있어요 🍱', hobby: '구름 사이로 곡예비행', dream: '지구 한 바퀴 날기', age: '비행시간은 비밀이에요' },
+  secret2: { hi: ['불이에요. 🔥 활활!', '가까이 오면 뜨거워요. 말은 따뜻하게 할게요.'],
+    me: '활활 타는 모닥불이에요. 불덩이를 던져서 주변을 태워요', food: '군고구마랑 마시멜로요 🍠', hobby: '불꽃 모양 바꾸기', dream: '꺼지지 않는 불꽃', age: '성냥 한 개비에서 태어났어요' },
+  secret3: { hi: ['웅덩이… 찰랑. 💧', '조용하지만 한 번 튀면 크게 튀어요.'],
+    me: '빗물이 고인 웅덩이예요. 커다란 물폭탄을 쏘아 올려요', food: '시원한 빗물이 최고예요 🌧️', hobby: '하늘 비춰 보기', dream: '언젠가 호수가 되는 거요', age: '지난 장마 때 생겼어요' },
 };
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const statusLine = t => `지금 웨이브 ${S.wave}! 저는 검은 차 ${t.kills}대 잡았어요 💪`;
@@ -1707,7 +1747,7 @@ $('chatForm').addEventListener('submit', e => { e.preventDefault(); send(chatInp
 chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
 
 // ---------- weapon guide ----------
-const ROLE = { police: '단일 · 빠른 연사', fire: '단일 · 둔화', dump: '범위 · 포물선 포탄', bumper: '단일 · 밀어내기', crane: '범위 · 강한 한 방', flume: '주변 전체 · 정지', tank: '단일 · 최장 사거리', secret1: '단일 · 포탄 (임시 능력치)', secret2: '범위 · 쌍포 (임시 능력치)', secret3: '범위 · 중포 (임시 능력치)' };
+const ROLE = { police: '단일 · 빠른 연사', fire: '단일 · 둔화', dump: '범위 · 포물선 포탄', bumper: '단일 · 밀어내기', crane: '범위 · 강한 한 방', flume: '주변 전체 · 정지', tank: '단일 · 최장 사거리', secret1: '단일 · 공중 사격 (임시 능력치)', secret2: '범위 · 불덩이 (임시 능력치)', secret3: '범위 · 물폭탄 (임시 능력치)' };
 let guideOpen = false;
 function openGuide(focus) {
   guideOpen = true;
