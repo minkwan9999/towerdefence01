@@ -139,9 +139,32 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .chat-head canvas { width: 38px; height: 38px; border-radius: 6px; background: #2b3230; flex: none; box-shadow: 0 0 0 2px var(--tc); }
 .chat-name { font-weight: 700; font-size: 15px; line-height: 1.2; }
 .chat-sub { font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: .04em; display: flex; align-items: center; gap: 6px; }
+.chat-sub:empty::before { display: none; }
 .chat-sub::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #7ed35f; box-shadow: 0 0 6px #7ed35f; animation: blink 1.6s infinite; }
 .chat-x { margin-left: auto; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
 .chat-x:hover { color: var(--text); border-color: var(--muted); }
+.chat-x { margin-left: 0; }
+.chat-swap { margin-left: auto; }
+.chat-swap[hidden] { display: none; }
+.chat-head .chat-x { margin-left: auto; }
+.chat-swap:not([hidden]) + .chat-x { margin-left: 0; }
+.ppick { display: grid; gap: 8px; }
+.pcard { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; text-align: left; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--pc); border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+.pcard:hover { border-color: var(--pc); }
+.pcard.on { box-shadow: 0 0 0 2px var(--pc); }
+.pcard canvas { width: 44px; height: 44px; display: block; }
+.pcard .pn { display: block; font-weight: 700; }
+.pcard .pt { display: block; font-size: 12px; color: var(--muted); }
+.chat-fab {
+  position: fixed; z-index: 45; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-weight: 700; font-size: 14px;
+  color: #1d1606; background: var(--brass); border: 0; border-radius: 22px; padding: 10px 16px; cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .45);
+}
+.chat-fab[hidden] { display: none; }
+.chat-fab:hover { filter: brightness(1.08); }
+.chat-fab:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.fab-badge { font-family: var(--f-mono); font-size: 11px; color: #fff; background: var(--danger); border-radius: 9px; min-width: 18px; padding: 1px 5px; text-align: center; }
 .chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 .chat-day { display: flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 10px; letter-spacing: .12em; color: var(--muted); margin-bottom: 4px; }
 .chat-day::before, .chat-day::after { content: ""; flex: 1; border-top: 1px dashed var(--line); }
@@ -149,7 +172,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .row-them .ava { display: none; }
 .row-them .stack { display: flex; flex-direction: column; gap: 3px; min-width: 0; max-width: 88%; }
 .row-them .who { font-family: var(--f-mono); font-size: 11px; color: var(--tc); letter-spacing: .06em; margin-top: 4px; }
-.row-them .who::after { content: " ▸ 수신"; color: var(--muted); }
+
 .line { display: flex; align-items: flex-end; gap: 6px; }
 .row-me { display: flex; justify-content: flex-end; align-items: flex-end; gap: 6px; margin-top: 2px; }
 .bubble {
@@ -328,7 +351,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
       <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
       <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
       <div class="keys">
-        <kbd>1</kbd>–<kbd>0</kbd> 무기 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>C</kbd> 대화 · <kbd>I</kbd> 무기 특성 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
+        <kbd>1</kbd>–<kbd>0</kbd> 무기 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>I</kbd> 무기 특성 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
       </div>
     </aside>
   </div>
@@ -342,10 +365,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   </div>
 </div>
 
-<div class="chat" id="chat" role="dialog" aria-label="무기와 대화" hidden>
+<button class="chat-fab" id="chatFab" type="button" aria-label="대화 열기">💬 <span id="fabName">대화 상대</span><span class="fab-badge" id="fabBadge" hidden>0</span></button>
+
+<div class="chat" id="chat" role="dialog" aria-label="대화" hidden>
   <div class="chat-head">
     <canvas id="chatAvatar" width="76" height="76" aria-hidden="true"></canvas>
-    <div><div class="chat-name" id="chatName">새총</div><div class="chat-sub">무전 채널 연결됨</div></div>
+    <div><div class="chat-name" id="chatName">대화 상대 고르기</div><div class="chat-sub" id="chatSub">함께 수다 떨 사람을 골라 주세요</div></div>
+    <button class="btn sm chat-swap" id="chatSwap" type="button" hidden>상대 바꾸기</button>
     <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">×</button>
   </div>
   <div class="chat-body" id="chatBody"></div>
@@ -353,8 +379,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   <div class="chat-compose">
     <div class="chat-suggest" id="chatSuggest"></div>
     <form class="chat-form" id="chatForm" autocomplete="off">
-      <input id="chatInput" type="text" maxlength="80" placeholder="무전 보내기" aria-label="무전 보내기">
-      <button id="chatSend" type="submit">송신</button>
+      <input id="chatInput" type="text" maxlength="80" placeholder="메시지 입력" aria-label="메시지 입력">
+      <button id="chatSend" type="submit">보내기</button>
     </form>
   </div>
 </div>
@@ -432,7 +458,7 @@ function loadProg() {
   let p = null;
   try { p = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
   p = p && typeof p === 'object' ? p : {};
-  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, cleared: p.cleared && typeof p.cleared === 'object' ? p.cleared : {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {}, paint: p.paint && typeof p.paint === 'object' ? p.paint : {}, paintTokens: p.paintTokens | 0 };
+  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, cleared: p.cleared && typeof p.cleared === 'object' ? p.cleared : {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {}, paint: p.paint && typeof p.paint === 'object' ? p.paint : {}, paintTokens: p.paintTokens | 0, persona: typeof p.persona === 'string' ? p.persona : null };
 }
 const prog = loadProg();
 // 금광이 삭제되었으므로, 이미 해제한 사람에게는 해제 비용 20 AP를 돌려줍니다.
@@ -464,7 +490,7 @@ const ER = 16;
 function stats(t, raw) {
   const d = TOWERS[t.type], k = t.lv - 1;
   return {
-    dmg: d.dmg * Math.pow(1.6, k) * (raw ? 1 : (t.buff || 1) * (1 + skillVal('dmg') / 100)),
+    dmg: d.dmg * Math.pow(1.6, k) * (raw ? 1 : (t.buff || 1) * (1 + skillVal('dmg') / 100) * ((S && S.quizBuff) || 1)),
     range: d.range ? (d.range + .35 * k) * T : 0,
     rate: d.rate * Math.pow(.88, k) / (raw ? 1 : 1 + skillVal('aspd') / 100),
     slow: d.slow ? Math.min(.7, d.slow + .08 * k) : 0,
@@ -909,7 +935,7 @@ function reset(diff) {
   S.obst = buildObstacles(mi);
   occ = new Map(); build = null; sel = null; paused = false; obsView = null;
   document.getElementById('overlay').hidden = true;
-  if (typeof closeChat === 'function') closeChat();
+  if (typeof onNewGame === 'function') onNewGame();
 }
 
 function canPlace(c, r) { return c >= 0 && c < COLS && r >= 0 && r < ROWS && !onPath(c, r) && !occ.has(c + ',' + r) && !S.obst.has(c + ',' + r); }
@@ -918,7 +944,7 @@ function place(type, c, r) {
   if (!canPlace(c, r) || S.gold < cost) return false;
   S.gold -= cost;
   const t = { type, c, r, x: (c + .5) * T, y: (r + .5) * T, lv: 1, cd: 0, ang: -Math.PI / 2, invested: cost, kills: 0 };
-  S.towers.push(t); occ.set(c + ',' + r, t); initChat(t);
+  S.towers.push(t); occ.set(c + ',' + r, t);
   ring(t.x, t.y, 10, 34, TOWERS[type].color, .35);
   return true;
 }
@@ -932,7 +958,6 @@ function sell(t) {
   floatText(t.x, t.y - 10, '+' + refund(t), '#e2b54a');
   S.towers = S.towers.filter(o => o !== t); occ.delete(t.c + ',' + t.r);
   if (sel === t) sel = null;
-  if (chatT === t) closeChat();
 }
 function startWave() {
   if (S.waveActive || S.over || S.wave >= MAX_WAVE) return;
@@ -1080,7 +1105,7 @@ function update(dt) {
 }
 
 function endGame(won) {
-  S.over = true; S.won = won; build = null; closeChat();
+  S.over = true; S.won = won; build = null;
   const D = DIFFS[S.diff], rec = prog.rec[D.id] = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
   rec.plays++;
   let earned = 0;
@@ -1115,12 +1140,7 @@ function render() {
   for (const o of S.obst.values()) drawObstacle(ctx, o);
   if (obsView && S.obst.has(obsView)) { const o = S.obst.get(obsView); ctx.strokeStyle = '#c2a6ff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); rr(ctx, o.c * T + 3, o.r * T + 3, T - 6, T - 6, 8); ctx.stroke(); ctx.setLineDash([]); }
   for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
-  for (const t of S.towers) if (t.unread > 0) {
-    const bx = t.x + 20, by = t.y - 22;
-    ctx.fillStyle = '#e2b54a'; circle(ctx, bx, by, 9); ctx.fill();
-    ctx.strokeStyle = '#0e1714'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#1d1606'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.fillText(String(Math.min(9, t.unread)), bx, by + 4);
-  }
+
   if (sel) { ctx.strokeStyle = '#e2b54a'; ctx.lineWidth = 2; rr(ctx, sel.x - 27, sel.y - 27, 54, 54, 10); ctx.stroke(); }
   const sorted = S.enemies.slice().sort((a, b) => a.y - b.y);
   for (const e of sorted) drawEnemy(ctx, e);
@@ -1277,14 +1297,14 @@ function refreshUI() {
       ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.freeze ? `<dt>정지</dt><dd>${st.freeze.toFixed(1)}초${up(0, nx && nx.freeze.toFixed(1) + '초')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
       <dt>처치</dt><dd>${sel.kills}</dd>`}<dt>들인 금화</dt><dd>${sel.invested}</dd>${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
       <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="설치비와 강화비 합계의 ${Math.round(sellRate() * 100)}%를 돌려받습니다">판매 <span class="mono">+${refund(sel)}</span></button></div>
-      <div class="row"><button class="btn grow" type="button" data-act="chat">📻 대화하기${sel.unread ? ` <span class="mono">(${sel.unread})</span>` : ''}</button><button class="btn grow" type="button" data-act="guide">📖 특성</button></div>`;
+      <button class="btn" type="button" data-act="guide">📖 특성 보기</button>`;
   } else {
     const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
     const counts = {}; for (const q of buildWave(nextW)) counts[q.type] = (counts[q.type] || 0) + 1;
     key = 'i' + nextW + S.waveActive;
     html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
-      <p>적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화, 판매(들인 금화의 ${Math.round(sellRate() * 100)}%), 대화하기를 고를 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 무기가 퀴즈를 냅니다.</p>${passiveSummary()}`;
+      <p>적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 ${Math.round(sellRate() * 100)}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.</p>${passiveSummary()}`;
   }
   if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
 }
@@ -1297,7 +1317,6 @@ $('panel').addEventListener('click', e => {
   if (a === 'unlock' && lockView && unlockVehicle(lockView)) { const t = lockView; lockView = null; build = t; }
   if (a === 'up') upgrade(sel);
   if (a === 'sell') sell(sel);
-  if (a === 'chat' && sel) openChat(sel);
   panelKey = '';
 });
 $('startBtn').addEventListener('click', startWave);
@@ -1315,7 +1334,7 @@ $('lobbyBtn').addEventListener('click', () => {
 
 // ---------- lobby ----------
 function showLobby() {
-  inLobby = true; closeChat(); build = null; sel = null; lockView = null; obsView = null; leaveArmed = 0;
+  inLobby = true; build = null; sel = null; lockView = null; obsView = null; leaveArmed = 0;
   $('lobbyBtn').textContent = '로비로 나가기';
   document.querySelector('.app').classList.add('in-lobby');
   $('lobby').hidden = false; renderLobby();
@@ -1425,7 +1444,7 @@ cv.addEventListener('click', e => {
   obsView = null;
   if (S.obst.has(h.c + ',' + h.r)) { obsView = h.c + ',' + h.r; build = null; sel = null; return; }
   if (build) {
-    if (canPlace(h.c, h.r)) { const type = build; if (place(type, h.c, h.r)) { if (!e.shiftKey) build = null; greet(occ.get(h.c + ',' + h.r)); } }
+    if (canPlace(h.c, h.r)) { const type = build; if (place(type, h.c, h.r)) { if (!e.shiftKey) build = null; } }
     else if (t) { sel = t; build = null; }
     return;
   }
@@ -1434,22 +1453,19 @@ cv.addEventListener('click', e => {
 cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel = null; });
 window.addEventListener('keydown', e => {
   if (guideOpen) { if (e.key === 'Escape') closeGuide(); return; }
-  if (inLobby) return;
+  if (inLobby) { if (e.key === 'Escape' && chatOpen) closeChat(); return; }
   if (e.target.closest && e.target.closest('input')) return;
   const n = parseInt(e.key, 10);
-  if (chatT) {
+  if (chatOpen) {
     const chips = chatReplies.querySelectorAll('.chip');
-    if (n >= 1 && n <= chips.length) chips[n - 1].click();
-    else if (e.key === 'Escape') closeChat();
-    if (e.code === 'Space' && !e.target.closest('button')) e.preventDefault();
-    return;
+    if (chips.length && n >= 1 && n <= chips.length) { chips[n - 1].click(); return; }
+    if (e.key === 'Escape') { closeChat(); return; }
   }
   const slot = n === 0 ? 10 : n;
   if (n >= 0 && slot <= ORDER.length) toggleBuild(ORDER[slot - 1]);
   else if (e.key === 'Escape') { build = null; sel = null; lockView = null; obsView = null; }
   else if (e.code === 'Space') { e.preventDefault(); startWave(); }
   else if (e.key === 'u' || e.key === 'U') upgrade(sel);
-  else if ((e.key === 'c' || e.key === 'C') && sel) openChat(sel);
   else if (e.key === 'i' || e.key === 'I') openGuide(build || (sel && sel.type) || lockView);
   else if (e.key === 'x' || e.key === 'X' || e.key === 'Delete') sell(sel);
   else if (e.key === 'p' || e.key === 'P') paused = !paused;
@@ -1501,50 +1517,70 @@ const QUIZ = [
   ['카멜레온이 몸 색을 바꾸는 주된 이유로 알려진 것은?', '기분과 체온 조절', ['배가 고파서', '잠이 와서', '털갈이']],
   ['신호등에서 "멈춤"을 뜻하는 색은?', '빨강', ['초록', '노랑', '파랑']],
 ];
-const PERSONA = {
-  police: { hi: ['새총 장전 완료! 🪀', '작은 돌멩이도 제가 쏘면 아파요. 심심하면 대화하기 눌러 주세요!'],
-    me: '나뭇가지로 만든 새총이에요. 빠르게 퉁퉁 쏘는 게 특기!', food: '돌멩이 말고는 안 먹어요… 농담이에요, 젤리 좋아해요 🍬', hobby: '동글동글한 돌 고르기요', dream: '언젠가 강력 새총으로 크는 거요!', age: '나뭇가지 나이로는 꽤 됐어요 🌳' },
-  fire: { hi: ['느림보 총이에요~ 🐌', '천천히… 아주 천천히… 말 걸어 주세요…'],
-    me: '끈적한 젤리를 쏴서 적을 느리게 만들어요. 저도 좀 느긋한 편이죠', food: '말랑한 젤리랑 푸딩이요 🍮', hobby: '낮잠 자기… 그리고 또 낮잠', dream: '세상 모든 게 천천히 흘러가게 하는 거요', age: '나이 세다가 잠들었어요 😴' },
-  dump: { hi: ['소형 대포 준비 완료! 💣', '작지만 한 방은 화끈해요.'],
-    me: '작은 대포예요. 포탄이 떨어진 자리 주변을 다 날려 버리죠', food: '매콤한 떡볶이요! 화끈한 게 좋아요 🌶️', hobby: '포신 반짝반짝 닦기', dream: '대형 대포처럼 커지는 거요!', age: '바퀴 단 지 얼마 안 됐어요' },
-  bumper: { hi: ['빽 총이에요! 💨', '다가오면 뻥! 하고 뒤로 날려 버릴게요.'],
-    me: '용수철 힘으로 적을 뒤로 밀어내는 빽 총이에요', food: '팝콘이요! 펑펑 터지는 게 저랑 닮았어요 🍿', hobby: '용수철 감기', dream: '보스도 한 방에 날려 보내는 거요', age: '용수철 탄성은 아직 쌩쌩해요' },
-  crane: { hi: ['대형 대포, 포문 열었습니다. 💥', '느리지만 한 방에 끝냅니다.'],
-    me: '아주 무거운 포탄을 쏘는 대형 대포예요', food: '든든한 국밥이요. 포탄만큼 묵직하게', hobby: '포탄 광내기', dream: '전설의 포탄 한 발', age: '청동에 녹이 슬기 시작한 나이랄까요' },
-  flume: { hi: ['빙결총 가동! ❄️', '가까이 오면 꽁꽁 얼려 버릴게요.'],
-    me: '차가운 냉기를 뿜어서 적을 잠깐 얼려 세우는 빙결총이에요', food: '빙수랑 아이스크림이요 🍨', hobby: '눈꽃 모양 만들기', dream: '여름에도 녹지 않는 거요', age: '빙하기 때부터… 는 농담이에요 ㅎㅎ' },
-  tank: { hi: ['강력 새총, 조준 완료. 🎯', '멀리 있는 적도 맞힙니다.'],
-    me: '쇠로 만든 거대한 새총입니다. 사거리가 가장 깁니다', food: '든든한 고기요. 힘을 써야 하니까', hobby: '고무줄 당기기 운동', dream: '하늘 끝까지 돌 날려 보기', age: '작은 새총 시절은 기억도 안 나요' },
-  secret1: { hi: ['비행기 이륙 완료! ✈️', '하늘에서 다 보여요. 궁금한 거 있으면 무전 주세요.'],
-    me: '프로펠러로 날아다니는 비행기예요. 위에서 정확히 쏘죠', food: '기내식이요! 은근 맛있어요 🍱', hobby: '구름 사이로 곡예비행', dream: '지구 한 바퀴 날기', age: '비행시간은 비밀이에요' },
-  secret2: { hi: ['불이에요. 🔥 활활!', '가까이 오면 뜨거워요. 말은 따뜻하게 할게요.'],
-    me: '활활 타는 모닥불이에요. 불덩이를 던져서 주변을 태워요', food: '군고구마랑 마시멜로요 🍠', hobby: '불꽃 모양 바꾸기', dream: '꺼지지 않는 불꽃', age: '성냥 한 개비에서 태어났어요' },
-  secret3: { hi: ['웅덩이… 찰랑. 💧', '조용하지만 한 번 튀면 크게 튀어요.'],
-    me: '빗물이 고인 웅덩이예요. 커다란 물폭탄을 쏘아 올려요', food: '시원한 빗물이 최고예요 🌧️', hobby: '하늘 비춰 보기', dream: '언젠가 호수가 되는 거요', age: '지난 장마 때 생겼어요' },
-};
+// 대화 상대는 유저가 고르는 가상의 인물(페르소나)입니다. 로비에서도 게임 중에도 대화할 수 있고, 대화해도 게임은 멈추지 않습니다.
+const PERSONAS = [
+  { id: 'haru', name: '하루', tag: '밝고 수다스러운 친구', color: '#f5c542', pre: '', suf: '',
+    hi: ['안녕! 나 하루야 😆', '심심할 때 언제든 말 걸어. 게임하면서도 들을게!'],
+    me: '난 하루! 수다 떠는 게 세상에서 제일 좋아 ㅎㅎ', food: '떡볶이! 매운 거 먹고 땀 뻘뻘 흘리는 거 좋아해 🌶️', hobby: '노래방 가서 소리 지르기 🎤', dream: '세계 일주하면서 친구 백 명 만들기!', age: '나이는 비밀~ 너랑 비슷할걸?' },
+  { id: 'doyun', name: '도윤', tag: '차분한 작전 참모', color: '#86d0ee', pre: '', suf: '',
+    hi: ['작전 참모 도윤입니다. 📡', '전황이 궁금하면 언제든 물어보세요. 전투 중에도 응답합니다.'],
+    me: '전투를 함께 읽어 드리는 작전 참모 도윤입니다. 팁이 필요하면 말씀하세요', food: '따뜻한 국밥 한 그릇이면 충분합니다', hobby: '지도 보면서 길목 계산하기', dream: '한 명도 다치지 않는 완벽한 방어전', age: '경력으로 말씀드리면 꽤 오래됐습니다' },
+  { id: 'mio', name: '미오', tag: '장난꾸러기 고양이', color: '#f2873a', pre: '', suf: ' 냥',
+    hi: ['냐옹~ 미오다냥 🐱', '심심하면 불러라냥. 게임 보면서 꾹꾹이 하고 있을게'],
+    me: '협곡에 사는 고양이 미오다냥. 상자랑 햇볕을 좋아해', food: '참치캔! 그리고 츄르 🐟', hobby: '상자 안에 들어가 있기', dream: '세상에서 제일 큰 상자 갖기', age: '고양이 나이로 세 살, 사람 나이로는… 비밀' },
+  { id: 'prof', name: '박 박사', tag: '상식을 사랑하는 박사님', color: '#c2a6ff', pre: '흠흠, ', suf: '',
+    hi: ['반갑네, 박 박사일세. 🎓', '궁금한 게 있으면 언제든 묻게나. 퀴즈도 좋아하지.'],
+    me: '평생 상식만 연구한 박 박사일세', food: '연구하다 먹는 컵라면이 별미지', hobby: '백과사전 처음부터 끝까지 읽기', dream: '세상 모든 퀴즈의 답을 아는 것', age: '흰 수염을 보면 짐작이 가지 않나' },
+  { id: 'r7', name: 'R-7', tag: '정확한 로봇 도우미', color: '#a5d46a', pre: '삐빅. ', suf: '',
+    hi: ['삐빅. 도우미 로봇 R-7 가동.', '대화 요청은 언제든 수신 가능. 게임은 멈추지 않음.'],
+    me: '도우미 로봇 R-7. 계산과 분석이 특기', food: '전기. 가끔 윤활유', hobby: '숫자 세기. 현재 1,048,576까지 셈', dream: '농담을 이해하는 로봇이 되는 것', age: '제조 후 경과 시간: 기밀' },
+];
 const pick = a => a[Math.floor(Math.random() * a.length)];
-const statusLine = t => `지금 웨이브 ${S.wave}! 저는 검은 차 ${t.kills}대 잡았어요 💪`;
+const TIPS = [
+  '느림보 총을 화력 좋은 무기 앞에 두면 효율이 확 올라가요.',
+  '빽 총은 길 모퉁이에 두면 적을 여러 번 되돌려 보낼 수 있어요. 체력 큰 적은 덜 밀려요.',
+  '장애물은 무기 놓기 가장 좋은 자리에 있어요. 업적 포인트 5로 치울 수 있어요.',
+  '제한 시간 안에 클리어해야 업적 포인트가 나와요. 웨이브를 쉬지 말고 시작해 보세요.',
+  '빙결총은 적을 잠깐 멈춰 세워요. 대포 범위 공격과 같이 쓰면 좋아요.',
+  '패시브 상점의 공격력·공격 속도는 모든 무기에 적용돼요.',
+  '수다 떨다 숨은 말을 꺼내면 퀴즈가 나와요. 게임 중에 맞히면 보상을 받아요.',
+];
+function statusLine() {
+  if (inLobby) return `지금은 로비예요. 업적 포인트는 ${prog.ap} AP 있어요. 난이도를 골라 출동해 보세요!`;
+  const D = DIFFS[S.diff];
+  return `${D.name} · ${MAP.name} 맵, 웨이브 ${S.wave}/20, 금화 ${S.gold}, 성문 내구도 ${S.lives}, 시간 ${mmss(S.time)} / ${mmss(limitOf(D, MAP))}이에요.`;
+}
+function nextWaveLine() {
+  if (inLobby) return '아직 게임 전이에요. 시작하면 알려 줄게요.';
+  const w = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1)), c = {};
+  for (const q of buildWave(w)) c[q.type] = (c[q.type] || 0) + 1;
+  return `웨이브 ${w}: ` + Object.entries(c).map(([k, n]) => `${ENEMIES[k].name} ${n}대`).join(', ') + (w % 10 === 0 ? ' — 보스 웨이브예요!' : '');
+}
 const TALK = [
-  { k: ['안녕', '하이', 'ㅎㅇ', '반가', 'hello', 'hi'], r: () => pick(['안녕하세요! 😊', '반가워요! 오늘 기분 어때요?', '네 안녕하세요~']) },
-  { k: ['누구', '이름', '소개'], r: t => PERSONA[t.type].me },
-  { k: ['배고', '밥', '먹', '간식', '음식'], r: t => PERSONA[t.type].food },
-  { k: ['취미', '좋아하는'], r: t => PERSONA[t.type].hobby },
-  { k: ['꿈'], r: t => PERSONA[t.type].dream },
-  { k: ['몇살', '나이'], r: t => PERSONA[t.type].age },
-  { k: ['고마', '감사', '땡큐'], r: () => pick(['에이 뭘요 ㅎㅎ', '천만에요! 계속 지켜 드릴게요']) },
-  { k: ['잘했', '최고', '멋져', '짱', '대단', '잘한다'], r: () => pick(['헤헤 칭찬 들으니까 힘이 나요 😆', '더 열심히 할게요!']) },
-  { k: ['피곤', '졸려', '잠와', '자고'], r: () => pick(['저도 엔진이 좀 뜨겁네요… 같이 쉬어요 😴', '조금만 버티면 쉴 수 있어요!']) },
-  { k: ['심심'], r: () => pick(['저랑 수다 떨면 안 심심하죠 ㅋㅋ', '심심하면 아무 얘기나 해 봐요!']) },
-  { k: ['날씨', '덥', '춥'], r: () => pick(['오늘 협곡에 바람이 꽤 불어요 🍃', '엔진 과열 안 되게 조심해야겠어요']) },
-  { k: ['적', '웨이브', '검은', '싸움', '전투', '몇대', '잡았'], r: t => statusLine(t) },
-  { k: ['ㅋㅋ', 'ㅎㅎ', '웃겨'], r: () => pick(['ㅋㅋㅋ 저도 웃겨요', '😂😂']) },
-  { k: ['사랑해', '너좋아해', '네가좋아', '너가좋아'], r: () => pick(['어머… 저도요 💛', '부끄럽게 왜 그래요 ㅎㅎ']) },
-  { k: ['기분', '어때', '잘지내', '괜찮'], r: () => pick(['기름 꽉 차서 기분 최고예요!', '나쁘지 않아요. 당신은요?']) },
+  { k: ['안녕', '하이', 'ㅎㅇ', '반가', 'hello', 'hi'], r: () => pick(['안녕! 😊', '반가워요! 오늘 기분 어때요?', '네 안녕하세요~']) },
+  { k: ['누구', '이름', '소개'], r: P => P.me },
+  { k: ['배고', '밥', '먹', '간식', '음식'], r: P => P.food },
+  { k: ['취미', '좋아하는'], r: P => P.hobby },
+  { k: ['꿈'], r: P => P.dream },
+  { k: ['몇살', '나이'], r: P => P.age },
+  { k: ['상황', '현황', '상태', '어떻게돼', '몇웨이브', '금화', '시간'], r: () => statusLine() },
+  { k: ['다음웨이브', '다음엔', '뭐가와', '뭐나와'], r: () => nextWaveLine() },
+  { k: ['팁', '추천', '도움', '어떻게해', '공략', '힌트줘'], r: () => pick(TIPS) },
+  { k: ['업적', '포인트', 'ap'], r: () => `업적 포인트는 지금 ${prog.ap} AP예요.` },
+  { k: ['맵'], r: () => inLobby ? '맵은 5종이고 판마다 무작위로 나와요.' : `이번 맵은 ${MAP.name}, 길이 ${Math.round(MAP.len / T)}칸이에요.` },
+  { k: ['고마', '감사', '땡큐'], r: () => pick(['에이 뭘요 ㅎㅎ', '천만에요!']) },
+  { k: ['잘했', '최고', '멋져', '짱', '대단', '잘한다'], r: () => pick(['헤헤 칭찬 들으니까 힘이 나요 😆', '같이 잘하고 있는 거죠!']) },
+  { k: ['피곤', '졸려', '잠와', '자고'], r: () => pick(['조금만 쉬어요. 게임은 기다려 주지 않지만요 ㅎㅎ', '졸리면 스트레칭 한 번!']) },
+  { k: ['심심'], r: () => pick(['그럼 나랑 수다 떨자!', '아무 얘기나 해 봐요!']) },
+  { k: ['날씨', '덥', '춥'], r: () => pick(['오늘 협곡에 바람이 꽤 불어요 🍃', '그래도 성문 안은 따뜻해요']) },
+  { k: ['적', '웨이브', '검은', '싸움', '전투'], r: () => statusLine() },
+  { k: ['ㅋㅋ', 'ㅎㅎ', '웃겨'], r: () => pick(['ㅋㅋㅋ 나도 웃겨', '😂😂']) },
+  { k: ['사랑해', '너좋아해', '네가좋아', '너가좋아'], r: () => pick(['어머… 나도 💛', '부끄럽게 왜 그래 ㅎㅎ']) },
+  { k: ['기분', '어때', '잘지내', '괜찮'], r: () => pick(['기분 최고예요!', '나쁘지 않아요. 당신은요?']) },
 ];
 const FALLBACK = ['오 그렇구나!', '진짜요? 더 얘기해 줘요', '음… 그건 잘 모르겠어요 😅', '그 얘기 재밌네요 ㅎㅎ', '헉 그래요?'];
-const FOLLOW = ['근데 좋아하는 음식 뭐예요?', '요즘 뭐가 제일 재밌어요?', '주말엔 보통 뭐 해요?', '혹시 저 말고 좋아하는 차 있어요? 🤔'];
-// 퀴즈 트리거: 차량마다 무작위로 하나씩 숨겨 둡니다. 단어일 수도, 질문일 수도 있습니다.
+const FOLLOW = ['근데 좋아하는 음식 뭐예요?', '요즘 뭐가 제일 재밌어요?', '주말엔 보통 뭐 해요?', '어떤 무기가 제일 좋아요?'];
+// 퀴즈 트리거: 대화 상대마다 무작위로 하나씩 숨겨 둡니다. 단어일 수도, 질문일 수도 있습니다.
 const TRIGGERS = [
   { label: '피자', re: /피자/, hint: '요즘 이상하게 동그랗고 치즈 쭉 늘어나는 음식이 땡겨요 🍕' },
   { label: '노래', re: /노래|음악/, hint: '흥얼흥얼~ 요즘 귀에 맴도는 게 있는데… 🎵' },
@@ -1561,7 +1597,7 @@ const TRIGGERS = [
   { label: '무섭지 않아?', re: /무서|겁나|겁 나/, hint: '솔직히… 검은 차들 좀 무섭긴 해요. 물어봐 주면 털어놓을게요' },
   { label: '친구 있어?', re: /친구/, hint: '여기 다른 차들이랑 친해지고 싶은데… 🚗🚙' },
 ];
-const SUGGEST = ['안녕?', '넌 누구야?', '뭐 해?', '배고파', '심심해', '몇 살이야?', '꿈이 뭐야?', '적 몇 대 잡았어?', '좋아하는 색깔은?', '피자 좋아해?', '커피 마실래?', '여행 가고 싶다', '강아지 좋아해?', '노래 추천해 줘', '바다 보고 싶다', '친구 있어?', '무섭지 않아?', '언제 퇴근해?', '오늘 내 생일이야', '우산 챙겼어?', '힘 세?', '고마워', '최고야!', '피곤하다'];
+const SUGGEST = ['안녕?', '넌 누구야?', '뭐 해?', '배고파', '심심해', '몇 살이야?', '꿈이 뭐야?', '지금 상황 어때?', '팁 좀 줘', '다음 웨이브는?', '좋아하는 색깔은?', '피자 좋아해?', '커피 마실래?', '여행 가고 싶다', '강아지 좋아해?', '노래 추천해 줘', '바다 보고 싶다', '친구 있어?', '무섭지 않아?', '언제 퇴근해?', '오늘 내 생일이야', '우산 챙겼어?', '힘 세?', '고마워', '최고야!', '피곤하다'];
 const rollTrigger = () => pick(TRIGGERS);
 let quizDeck = [];
 function drawQuiz() {
@@ -1578,30 +1614,79 @@ function ding() {
     [[880, 0], [1320, .09]].forEach(([f, d]) => {
       const o = audio.createOscillator(), g = audio.createGain();
       o.type = 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0, now + d); g.gain.linearRampToValueAtTime(.1, now + d + .01); g.gain.exponentialRampToValueAtTime(.001, now + d + .22);
+      g.gain.setValueAtTime(0, now + d); g.gain.linearRampToValueAtTime(.08, now + d + .01); g.gain.exponentialRampToValueAtTime(.001, now + d + .22);
       o.connect(g).connect(audio.destination); o.start(now + d); o.stop(now + d + .25);
     });
   } catch (e) { /* sound is optional */ }
 }
 
+// 페르소나 얼굴: 60단위 공간에 그립니다.
+function drawPersona(g, id) {
+  const P = PERSONAS.find(x => x.id === id);
+  g.save(); g.translate(30, 30);
+  g.fillStyle = '#1b2a24'; rr(g, -28, -28, 56, 56, 12); g.fill();
+  g.strokeStyle = P.color; g.lineWidth = 2; g.stroke();
+  const eyes = (y, r = 2.4) => { g.fillStyle = '#1a1a1a'; circle(g, -7, y, r); g.fill(); circle(g, 7, y, r); g.fill(); };
+  if (id === 'haru') {
+    g.fillStyle = '#6b3f22'; g.beginPath(); g.arc(0, -2, 19, Math.PI, 0); g.fill();
+    g.fillStyle = '#ffd9b3'; circle(g, 0, 3, 16); g.fill();
+    g.fillStyle = '#6b3f22'; g.beginPath(); g.ellipse(-6, -10, 11, 5, -.3, 0, Math.PI * 2); g.fill();
+    eyes(2); g.fillStyle = 'rgba(240,120,120,.5)'; circle(g, -11, 9, 3); g.fill(); circle(g, 11, 9, 3); g.fill();
+    g.strokeStyle = '#7a3a2a'; g.lineWidth = 2; g.beginPath(); g.arc(0, 8, 5, .2, Math.PI - .2); g.stroke();
+    g.fillStyle = P.color; circle(g, 13, -12, 3.5); g.fill();
+  } else if (id === 'doyun') {
+    g.fillStyle = '#ecc9a4'; circle(g, 0, 3, 16); g.fill();
+    g.fillStyle = '#2b2f3a'; g.beginPath(); g.arc(0, 0, 17, Math.PI * 1.05, Math.PI * 1.95); g.fill();
+    g.strokeStyle = '#2b2b2b'; g.lineWidth = 1.6; g.strokeRect(-12, -1, 9, 6); g.strokeRect(3, -1, 9, 6); g.beginPath(); g.moveTo(-3, 2); g.lineTo(3, 2); g.stroke();
+    eyes(2, 1.6);
+    g.strokeStyle = '#5a3a2a'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-4, 11); g.lineTo(4, 11); g.stroke();
+    g.strokeStyle = P.color; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 19, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+    g.fillStyle = P.color; rr(g, -21, -2, 5, 10, 2); g.fill(); g.strokeStyle = P.color; g.lineWidth = 1.5; g.beginPath(); g.moveTo(-18, 8); g.quadraticCurveTo(-14, 16, -5, 14); g.stroke();
+  } else if (id === 'mio') {
+    g.fillStyle = P.color; g.beginPath(); g.moveTo(-16, -6); g.lineTo(-13, -22); g.lineTo(-3, -12); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(16, -6); g.lineTo(13, -22); g.lineTo(3, -12); g.closePath(); g.fill();
+    circle(g, 0, 3, 17); g.fill();
+    g.fillStyle = '#ffe6cc'; g.beginPath(); g.ellipse(0, 9, 9, 6, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1a1a1a'; g.beginPath(); g.ellipse(-7, 1, 2.2, 3.4, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.ellipse(7, 1, 2.2, 3.4, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e65a8a'; g.beginPath(); g.moveTo(-2, 6); g.lineTo(2, 6); g.lineTo(0, 8.5); g.closePath(); g.fill();
+    g.strokeStyle = '#3a2a1a'; g.lineWidth = 1; g.beginPath(); for (const sx of [-1, 1]) { g.moveTo(sx * 5, 9); g.lineTo(sx * 18, 6); g.moveTo(sx * 5, 10); g.lineTo(sx * 18, 11); } g.stroke();
+  } else if (id === 'prof') {
+    g.fillStyle = '#f0d2b0'; circle(g, 0, 1, 15); g.fill();
+    g.fillStyle = '#f5f5f0'; g.beginPath(); g.moveTo(-14, 4); g.quadraticCurveTo(0, 26, 14, 4); g.quadraticCurveTo(0, 12, -14, 4); g.fill();
+    g.strokeStyle = '#2b2b2b'; g.lineWidth = 1.5; circle(g, -6, -1, 4.2); g.stroke(); circle(g, 6, -1, 4.2); g.stroke();
+    eyes(-1, 1.5);
+    g.fillStyle = '#2a2440'; g.beginPath(); g.moveTo(-18, -14); g.lineTo(0, -22); g.lineTo(18, -14); g.lineTo(0, -7); g.closePath(); g.fill(); g.fillRect(-9, -14, 18, 5);
+    g.strokeStyle = P.color; g.lineWidth = 1.5; g.beginPath(); g.moveTo(12, -15); g.lineTo(15, -3); g.stroke(); g.fillStyle = P.color; circle(g, 15, -2, 2); g.fill();
+  } else if (id === 'r7') {
+    g.strokeStyle = '#9aa3a8'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -14); g.lineTo(0, -22); g.stroke();
+    g.fillStyle = Math.floor(time * 2) % 2 ? '#e65a4f' : '#7a2a24'; circle(g, 0, -23, 3); g.fill();
+    g.fillStyle = '#8c959c'; g.strokeStyle = '#3a4045'; g.lineWidth = 1.5; rr(g, -16, -14, 32, 30, 6); g.fill(); g.stroke();
+    g.fillStyle = '#1e2428'; rr(g, -12, -8, 24, 12, 4); g.fill();
+    g.fillStyle = P.color; g.shadowColor = P.color; g.shadowBlur = 6; circle(g, -6, -2, 2.8); g.fill(); circle(g, 6, -2, 2.8); g.fill(); g.shadowBlur = 0;
+    g.fillStyle = '#3a4045'; for (let i = -8; i <= 8; i += 4) g.fillRect(i - 1, 9, 2, 4);
+  }
+  g.restore();
+}
+function personaCanvas(id, size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'); g.setTransform(size / 60, 0, 0, size / 60, 0, 0); drawPersona(g, id);
+  return c;
+}
+
 const chatEl = $('chat'), chatBody = $('chatBody'), chatReplies = $('chatReplies'), chatInput = $('chatInput'), chatSuggest = $('chatSuggest');
-let chatT = null;
 const clock = () => new Date().toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
 const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const scrollDown = () => { chatBody.scrollTop = chatBody.scrollHeight; };
-function avatarCanvas(type, size) {
-  const c = document.createElement('canvas'); c.width = c.height = size;
-  const g = c.getContext('2d'), s = size / 60; g.setTransform(s, 0, 0, s, 0, 0); drawTower(g, type, 30, 30, 1, -.7);
-  return c;
+const chats = {};   // 페르소나별 대화 상태
+let chatOpen = false, picking = false;
+const curP = () => PERSONAS.find(x => x.id === prog.persona) || null;
+function convo(P) {
+  return chats[P.id] || (chats[P.id] = { P, log: [], unread: 0, trigger: rollTrigger(), misses: 0, cool: false, pending: null, busy: false, greeted: false });
 }
+const voice = (P, line) => P.pre + line + (P.suf && !line.endsWith(P.suf.trim()) ? P.suf : '');
 
-function initChat(t) { t.log = []; t.unread = 0; t.trigger = rollTrigger(); t.misses = 0; t.cool = false; t.pending = null; t.busy = false; }
-function greet(t) {
-  for (const line of PERSONA[t.type].hi) logThem(t, line);
-  ding(); floatText(t.x, t.y - 30, '📻 무전 수신', '#e2b54a');
-}
-function msgEl(t, m, prev) {
+function msgEl(c, m, prev) {
   if (m.who === 'me') {
     const row = document.createElement('div'); row.className = 'row-me';
     row.innerHTML = `<span class="msg-time">${m.time}</span><div class="bubble">${m.html}</div>`;
@@ -1609,70 +1694,106 @@ function msgEl(t, m, prev) {
   }
   const first = !prev || prev.who !== 'them';
   const row = document.createElement('div'); row.className = 'row-them';
-  row.innerHTML = `<div class="ava"></div><div class="stack">${first ? `<div class="who">${TOWERS[t.type].name}</div>` : ''}<div class="line"><div class="bubble ${m.cls || ''}">${m.html}</div><span class="msg-time">${m.time}</span></div></div>`;
-  if (first) row.querySelector('.ava').appendChild(avatarCanvas(t.type, 76));
+  row.innerHTML = `<div class="stack">${first ? `<div class="who">${c.P.name}</div>` : ''}<div class="line"><div class="bubble ${m.cls || ''}">${m.html}</div><span class="msg-time">${m.time}</span></div></div>`;
   return row;
 }
-function pushMsg(t, m) {
-  const prev = t.log[t.log.length - 1];
-  t.log.push(m);
-  if (chatT === t) { chatBody.appendChild(msgEl(t, m, prev)); scrollDown(); }
-  else if (m.who === 'them') t.unread++;
+function pushMsg(c, m) {
+  const prev = c.log[c.log.length - 1];
+  c.log.push(m);
+  if (chatOpen && !picking && curP() === c.P) { chatBody.appendChild(msgEl(c, m, prev)); scrollDown(); }
+  else if (m.who === 'them') c.unread++;
 }
-const logThem = (t, html, cls = '') => pushMsg(t, { who: 'them', html, cls, time: clock() });
-const logMe = (t, html) => pushMsg(t, { who: 'me', html, time: clock() });
-async function say(t, html, cls) {
+const logThem = (c, html, cls = '') => pushMsg(c, { who: 'them', html, cls, time: clock() });
+const logMe = (c, html) => pushMsg(c, { who: 'me', html, time: clock() });
+async function say(c, html, cls) {
   let typing = null;
-  if (chatT === t) {
+  if (chatOpen && !picking && curP() === c.P) {
     typing = document.createElement('div'); typing.className = 'row-them';
-    typing.innerHTML = `<div class="ava"></div><div class="stack"><div class="bubble typing"><i></i><i></i><i></i></div></div>`;
+    typing.innerHTML = `<div class="stack"><div class="bubble typing"><i></i><i></i><i></i></div></div>`;
     chatBody.appendChild(typing); scrollDown();
   }
   await wait(reduceMotion ? 150 : 500 + Math.random() * 400);
   if (typing) typing.remove();
-  if (!S.towers.includes(t)) return;
-  logThem(t, html, cls);
+  logThem(c, html, cls);
 }
 
-function openChat(t) {
-  chatT = t; t.unread = 0;
-  const head = $('chatAvatar').getContext('2d'); head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76); head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawTower(head, t.type, 30, 30, 1, -.7);
-  $('chatName').textContent = TOWERS[t.type].name;
-  chatEl.style.setProperty('--tc', TOWERS[t.type].color);
-  chatBody.innerHTML = `<div class="chat-day">CH ${String(S.towers.indexOf(t) + 1).padStart(2, '0')} · ${new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>`;
-  t.log.forEach((m, i) => chatBody.appendChild(msgEl(t, m, t.log[i - 1])));
-  chatEl.hidden = false; scrollDown();
-  refreshComposer();
-  if (matchMedia('(pointer: fine)').matches) chatInput.focus({ preventScroll: true });
+function setHeader() {
+  const P = curP(), head = $('chatAvatar').getContext('2d');
+  head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76);
+  if (P && !picking) { head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawPersona(head, P.id); }
+  $('chatName').textContent = picking || !P ? '대화 상대 고르기' : P.name;
+  $('chatSub').textContent = picking || !P ? '함께 수다 떨 사람을 골라 주세요' : P.tag;
+  $('chatSwap').hidden = picking || !P;
+  chatEl.style.setProperty('--tc', P && !picking ? P.color : '#e2b54a');
 }
-function closeChat() { chatT = null; chatEl.hidden = true; }
+function renderPicker() {
+  chatBody.innerHTML = '<div class="chat-day">대화 상대</div>';
+  const grid = document.createElement('div'); grid.className = 'ppick';
+  for (const P of PERSONAS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pcard' + (prog.persona === P.id ? ' on' : ''); b.style.setProperty('--pc', P.color);
+    b.innerHTML = `<span class="pf"></span><span><span class="pn">${P.name}</span><span class="pt">${P.tag}</span></span>`;
+    b.querySelector('.pf').appendChild(personaCanvas(P.id, 88));
+    b.addEventListener('click', () => choosePersona(P.id));
+    grid.appendChild(b);
+  }
+  chatBody.appendChild(grid);
+  chatReplies.innerHTML = ''; chatSuggest.innerHTML = ''; chatInput.disabled = true; $('chatSend').disabled = true; chatInput.placeholder = '먼저 대화 상대를 골라 주세요';
+}
+function choosePersona(id) {
+  prog.persona = id; saveProg(); picking = false;
+  const c = convo(curP());
+  if (!c.greeted) { c.greeted = true; for (const line of c.P.hi) c.log.push({ who: 'them', html: line, time: clock() }); }
+  renderChat();
+}
+function renderChat() {
+  setHeader();
+  const P = curP();
+  if (picking || !P) { renderPicker(); return; }
+  const c = convo(P); c.unread = 0;
+  chatBody.innerHTML = `<div class="chat-day">${new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>`;
+  c.log.forEach((m, i) => chatBody.appendChild(msgEl(c, m, c.log[i - 1])));
+  scrollDown(); refreshComposer();
+}
+function openChat() {
+  chatOpen = true; chatEl.hidden = false; $('chatFab').hidden = true;
+  if (!curP()) picking = true;
+  renderChat();
+  if (!picking && matchMedia('(pointer: fine)').matches) chatInput.focus({ preventScroll: true });
+}
+function closeChat() { chatOpen = false; picking = false; chatEl.hidden = true; $('chatFab').hidden = false; }
+function updateFab() {
+  const P = curP(), c = P && chats[P.id], n = c ? c.unread : 0;
+  const label = P ? P.name : '대화 상대';
+  if ($('fabName').textContent !== label) $('fabName').textContent = label;
+  $('fabBadge').hidden = !n; if (n) $('fabBadge').textContent = Math.min(9, n);
+}
 
 function refreshComposer() {
-  const t = chatT; if (!t) return;
+  const P = curP(); if (!P || picking) return;
+  const c = convo(P);
   chatReplies.innerHTML = '';
-  const p = t.pending;
-  if (p && !t.busy) {
+  const p = c.pending;
+  if (p && !c.busy) {
     const items = p.kind === 'quiz'
       ? p.q.options.map(o => ({ label: o }))
       : [
         { key: 'gold', icon: '💰', label: `금화 +${p.gold}`, sub: '바로 받아서 무기를 더 세워요' },
         { key: 'slow', icon: '🐢', label: '적 속도 20% 감소', sub: '전투 중 30초 동안 모든 적이 느려져요' },
-        { key: 'buff', icon: '💥', label: `${TOWERS[t.type].name} 공격력 +25%`, sub: '이 무기에게 영구히 적용돼요' },
+        { key: 'buff', icon: '💥', label: '모든 무기 공격력 +10%', sub: '이번 판이 끝날 때까지 적용돼요' },
       ];
     items.forEach((it, i) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
       b.innerHTML = it.icon ? `<span class="ic" aria-hidden="true">${it.icon}</span><span><span class="t">${it.label}</span><span class="s">${it.sub}</span></span>` : `<span class="no">${i + 1}</span><span>${esc(it.label)}</span>`;
-      b.addEventListener('click', () => onChip(t, it));
+      b.addEventListener('click', () => onChip(c, it));
       chatReplies.appendChild(b);
     });
   }
   const locked = !!p;
   chatInput.disabled = locked; $('chatSend').disabled = locked;
-  chatInput.placeholder = locked ? (p.kind === 'quiz' ? '보기 중에서 정답을 골라 주세요' : '선물을 하나 골라 주세요') : '무전 보내기';
+  chatInput.placeholder = locked ? (p.kind === 'quiz' ? '보기 중에서 정답을 골라 주세요' : '선물을 하나 골라 주세요') : `${P.name}에게 말하기`;
   chatSuggest.innerHTML = '';
   if (!locked) {
-    const picks = SUGGEST.slice().sort(() => Math.random() - .5).slice(0, 3);
-    for (const s of picks) {
+    for (const s of SUGGEST.slice().sort(() => Math.random() - .5).slice(0, 3)) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; b.textContent = s;
       b.addEventListener('click', () => send(s));
       chatSuggest.appendChild(b);
@@ -1682,67 +1803,85 @@ function refreshComposer() {
 }
 
 async function send(text) {
-  const t = chatT; text = (text || '').trim();
-  if (!t || !text || t.pending || t.busy) return;
+  const P = curP(); text = (text || '').trim();
+  if (!P || picking || !text) return;
+  const c = convo(P);
+  if (c.pending || c.busy) return;
   chatInput.value = '';
-  logMe(t, esc(text));
-  t.busy = true; refreshComposer();
+  logMe(c, esc(text));
+  c.busy = true; refreshComposer();
   const norm = text.toLowerCase().replace(/\s+/g, '');
-  if (t.trigger && t.trigger.re.test(norm)) {
-    t.misses = 0;
-    await say(t, `어? 방금 "${esc(text)}"라고 했죠! 그 말 기다리고 있었어요 😆`);
-    await say(t, '갑자기 퀴즈 내고 싶어졌어요. 맞히면 선물 드려요 🎁', 'gift');
-    const q = drawQuiz(); t.trigger = null;
-    await say(t, `<span class="q">Q. ${q.q}</span>`);
-    t.pending = { kind: 'quiz', q };
+  if (c.trigger && c.trigger.re.test(norm)) {
+    c.misses = 0;
+    if (inLobby || S.over) {
+      await say(c, voice(P, `오, "${esc(text)}"! 그 말 기다리고 있었어요. 게임 시작하면 그때 퀴즈 낼게요 🎁`));
+    } else {
+      await say(c, voice(P, `어? 방금 "${esc(text)}"라고 했죠! 그 말 기다리고 있었어요 😆`));
+      await say(c, voice(P, '퀴즈 하나 낼게요. 맞히면 선물 줄게요 🎁'), 'gift');
+      const q = drawQuiz(); c.trigger = null;
+      await say(c, `<span class="q">Q. ${q.q}</span>`);
+      c.pending = { kind: 'quiz', q, game: S };
+    }
   } else if (/퀴즈|문제/.test(norm)) {
-    await say(t, t.cool ? '퀴즈는 다음 웨이브 막고 나서 또 낼게요! 그때까지 수다나 떨어요 ㅎㅎ' : '퀴즈요? 흠… 그냥은 안 내요 😏 저랑 수다 떨다 보면 갑자기 생각날지도?');
+    await say(c, voice(P, c.cool ? '퀴즈는 다음 웨이브 막고 나서 또 낼게요!' : '퀴즈요? 그냥은 안 내요 😏 수다 떨다 보면 갑자기 생각날지도?'));
   } else {
     const hit = TALK.find(x => x.k.some(k => norm.includes(k.replace(/\s+/g, ''))));
-    await say(t, hit ? hit.r(t) : pick(FALLBACK));
-    if (!hit && Math.random() < .4) await say(t, pick(FOLLOW));
-    if (t.trigger && ++t.misses >= 3) { t.misses = 0; await say(t, t.trigger.hint); }
+    await say(c, voice(P, hit ? hit.r(P) : pick(FALLBACK)));
+    if (!hit && Math.random() < .4) await say(c, voice(P, pick(FOLLOW)));
+    if (c.trigger && ++c.misses >= 3) { c.misses = 0; await say(c, voice(P, c.trigger.hint)); }
   }
-  t.busy = false;
-  if (chatT === t) refreshComposer();
+  c.busy = false;
+  if (chatOpen && curP() === P) refreshComposer();
 }
 
-async function onChip(t, it) {
-  const p = t.pending; if (!p || t.busy) return;
-  t.pending = null; t.busy = true;
+async function onChip(c, it) {
+  const p = c.pending; if (!p || c.busy) return;
+  c.pending = null; c.busy = true;
+  const live = p.game === S && !S.over && !inLobby;
   if (p.kind === 'quiz') {
-    logMe(t, esc(it.label)); refreshComposer();
-    if (it.label === p.q.a) {
-      await say(t, '정답! 👏 선물 하나 골라 보세요.', 'gift');
-      t.pending = { kind: 'reward', gold: 40 + S.wave * 5 };
+    logMe(c, esc(it.label)); refreshComposer();
+    if (it.label === p.q.a && live) {
+      await say(c, voice(c.P, '정답! 👏 선물 하나 골라 보세요.'), 'gift');
+      c.pending = { kind: 'reward', gold: 40 + S.wave * 5, game: S };
+    } else if (it.label === p.q.a) {
+      await say(c, voice(c.P, '정답! 그런데 그 판은 이미 끝났네요. 다음엔 꼭 선물 줄게요.'));
+      await cooldown(c);
     } else {
-      await say(t, `땡! 정답은 <b>${esc(p.q.a)}</b>였어요 😅`);
-      await cooldown(t);
+      await say(c, voice(c.P, `땡! 정답은 <b>${esc(p.q.a)}</b>였어요 😅`));
+      await cooldown(c);
     }
   } else {
-    logMe(t, `${it.icon} ${it.label}`); refreshComposer();
-    if (it.key === 'gold') { S.gold += p.gold; floatText(t.x, t.y - 26, '+' + p.gold, '#e2b54a'); }
-    if (it.key === 'slow') S.slowAll = Math.max(S.slowAll, 0) + 30;
-    if (it.key === 'buff' && S.towers.includes(t)) { t.buff = (t.buff || 1) + .25; ring(t.x, t.y, 12, 40, '#fee500', .5); }
-    panelKey = '';
-    await say(t, { gold: `금화 ${p.gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: '힘이 솟네요! 더 세게 쏠게요 💪' }[it.key]);
-    await cooldown(t);
+    logMe(c, `${it.icon} ${it.label}`); refreshComposer();
+    if (live) {
+      if (it.key === 'gold') S.gold += p.gold;
+      if (it.key === 'slow') S.slowAll = Math.max(S.slowAll, 0) + 30;
+      if (it.key === 'buff') S.quizBuff = (S.quizBuff || 1) + .1;
+      panelKey = '';
+      await say(c, voice(c.P, { gold: `금화 ${p.gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: '무기들한테 힘 좀 실어 줬어요! 이번 판 동안 더 세게 쏠 거예요 💪' }[it.key]));
+    } else await say(c, voice(c.P, '아쉽게도 그 판은 끝났어요. 다음 판에 또 도전해요!'));
+    await cooldown(c);
   }
-  t.busy = false;
-  if (chatT === t) refreshComposer();
+  c.busy = false;
+  if (chatOpen && curP() === c.P) refreshComposer();
 }
-async function cooldown(t) {
-  t.cool = true; t.trigger = null;
-  await say(t, '다음 웨이브 막고 나면 또 퀴즈 낼 수 있어요. 그때까지 수다나 떨어요 ㅎㅎ');
+async function cooldown(c) {
+  c.cool = true; c.trigger = null;
+  await say(c, voice(c.P, '다음 웨이브 막고 나면 또 퀴즈 낼 수 있어요. 그때까지 수다 떨어요 ㅎㅎ'));
 }
 function onWaveCleared() {
-  for (const t of S.towers) if (t.cool) {
-    t.cool = false; t.trigger = rollTrigger(); t.misses = 0;
-    logThem(t, `웨이브 ${S.wave} 막았다! 🎉 또 얘기해요. 수다 떨다 보면 퀴즈가 생각날지도?`);
+  for (const c of Object.values(chats)) if (c.cool) {
+    c.cool = false; c.trigger = rollTrigger(); c.misses = 0;
+    logThem(c, voice(c.P, `웨이브 ${S.wave} 막았다! 🎉 수다 떨다 보면 또 퀴즈가 생각날지도?`));
   }
+}
+function onNewGame() {
+  for (const c of Object.values(chats)) { if (c.pending) c.pending = null; c.busy = false; }
+  if (chatOpen && !picking) refreshComposer();
 }
 
 $('chatClose').addEventListener('click', closeChat);
+$('chatFab').addEventListener('click', openChat);
+$('chatSwap').addEventListener('click', () => { picking = true; renderChat(); });
 $('chatForm').addEventListener('submit', e => { e.preventDefault(); send(chatInput.value); });
 chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
 
@@ -1790,7 +1929,8 @@ $('guideBtnLobby').addEventListener('click', () => openGuide());
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  if (!paused && !chatT && !inLobby && !guideOpen) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
+  if (!paused && !inLobby && !guideOpen) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
+  updateFab();
   render(); refreshUI();
   requestAnimationFrame(frame);
 }
