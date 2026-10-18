@@ -503,7 +503,7 @@ const skillVal = id => skillLv(id) * SKILLS.find(k => k.id === id).per;
 const sellRate = () => .5 + skillVal('sell') / 100;
 const ORDER = ['police', 'fire', 'dump', 'bumper', 'crane', 'flume', 'tank'];
 const ITEMS = {
-  secret1: { name: '비행기', color: '#7fb2e5', desc: '길의 시작부터 끝까지 날아가며, 아래에 적이 있으면 폭탄을 떨어뜨립니다. 적을 만나도 멈추지 않습니다.' },
+  secret1: { name: '비행기', color: '#7fb2e5', consumable: true, desc: '길의 시작부터 끝까지 날아가며, 아래에 적이 있으면 폭탄을 떨어뜨립니다. 적을 만나도 멈추지 않습니다. 출격할 때마다 호감도를 씁니다.' },
   secret2: { name: '불', color: '#ff7a2f', place: true, consumable: true, desc: '길 한 칸에 1분 동안 불을 놓습니다. 지나가는 적은 불이 붙어 4초 동안 체력이 계속 줄어듭니다. 놓을 때마다 호감도를 씁니다.' },
   secret3: { name: '웅덩이', color: '#3f8fd0', place: true, consumable: true, desc: '길 한 칸에 1분 동안 웅덩이를 만듭니다. 지나가는 적은 3초 동안 40% 느려집니다. 놓을 때마다 호감도를 씁니다.' },
 };
@@ -1980,14 +1980,21 @@ $('chatForm').addEventListener('submit', e => { e.preventDefault(); send(chatInp
 chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
 
 // ---------- affection items ----------
-// 비행기: 호감도로 한 번 사면 계속 보유하고, 한 판에 한 번씩 쓸 수 있습니다.
-// 불·웅덩이: 놓을 때마다 지금 대화 상대의 호감도를 쓰고, 1분 동안 유지됩니다. 호감도가 남아 있으면 몇 번이든 쓸 수 있습니다.
+// 비행기·불·웅덩이: 따로 사지 않고, 쓸 때마다 지금 대화 상대의 호감도를 씁니다. 호감도가 남아 있으면 몇 번이든 쓸 수 있습니다.
+// 비행기는 바로 출격하고, 불·웅덩이는 길 한 칸에 놓아 지금 대화 상대의 호감도를 쓰고, 1분 동안 유지됩니다. 호감도가 남아 있으면 몇 번이든 쓸 수 있습니다.
 const HAZARD_LIFE = 60;
 let itemPlace = null;
 const hazardAt = (c, r) => S.hazards.some(h => h.c === c && h.r === r);
 const canAfford = () => { const P = curP(); return !!P && affOf(P) >= ITEM_COST; };
 function useItem(k) {
   if (inLobby || S.over) return;
+  if (k === 'secret1') {
+    const P = curP(); if (!P || affOf(P) < ITEM_COST) return;
+    prog.aff[P.id] = Math.round((affOf(P) - ITEM_COST) * 10) / 10; saveProg(); updateAffUI();
+    S.planes.push({ d: 0, cd: 0, x: PTS[0].x, y: PTS[0].y, ang: 0 });
+    floatText(80, PTS[0].y - 24, '✈️ 출격! -💗' + ITEM_COST, '#7fb2e5');
+    panelKey = ''; return;
+  }
   if (ITEMS[k].consumable) {
     if (itemPlace === k) itemPlace = null;
     else if (canAfford()) { itemPlace = k; build = null; sel = null; lockView = null; obsView = null; }
@@ -2059,17 +2066,17 @@ function drawItemIcon(cvs, k) {
 let itemsKey = '';
 function renderItemsBar() {
   const P = curP(), aff = P ? Math.floor(affOf(P)) : 0;
-  const key = ITEM_KEYS.map(k => [!!prog.items[k], !!S.itemUsed[k], itemPlace === k, S.hazards.filter(h => h.type === k).length]).join() + '|' + aff + (P ? P.id : '') + S.over;
+  const key = ITEM_KEYS.map(k => [!!prog.items[k], !!S.itemUsed[k], itemPlace === k, S.hazards.filter(h => h.type === k).length, k === 'secret1' ? S.planes.length : 0]).join() + '|' + aff + (P ? P.id : '') + S.over;
   if (key === itemsKey) return; itemsKey = key;
   const bar = $('itemsBar'); bar.innerHTML = '';
   for (const k of ITEM_KEYS) {
     const it = ITEMS[k], own = !!prog.items[k], used = !!S.itemUsed[k], placing = itemPlace === k;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'icard' + (placing ? ' on' : '') + (own ? '' : ' locked'); b.style.setProperty('--ic', it.color);
     let st, act;
-    const nOn = S.hazards.filter(h => h.type === k).length;
+    const nOn = k === 'secret1' ? S.planes.length : S.hazards.filter(h => h.type === k).length;
     if (it.consumable) {
       if (placing) { st = '길 칸을 고르세요 · 취소'; act = 'use'; }
-      else { st = `💗 ${ITEM_COST}씩 · 1분` + (nOn ? ` · ${nOn}개 놓임` : ''); act = 'use'; b.disabled = S.over || !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
+      else { st = `💗 ${ITEM_COST}씩 · ` + (it.place ? '1분' : '출격') + (nOn ? ` · ${nOn}${it.place ? '개 놓임' : '대 비행 중'}` : ''); act = 'use'; b.disabled = S.over || !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
       b.classList.remove('locked');
     } else if (!own) { st = `💗 ${ITEM_COST}로 구매`; act = 'buy'; b.disabled = !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
     else if (used) { st = '이번 판 사용함'; act = ''; b.disabled = true; }
@@ -2094,7 +2101,7 @@ function renderAffShop() {
     const it = ITEMS[k], own = !!prog.items[k], can = P && aff >= ITEM_COST;
     return `<div class="acard" style="--ic:${it.color}"><canvas width="88" height="88" data-icon="${k}" aria-hidden="true"></canvas><div>
       <div class="nm">${it.name}</div><div class="ds">${it.desc}</div>
-      ${it.consumable ? `<span class="owned">게임 중 놓을 때마다 💗 ${ITEM_COST} · 1분 지속</span>` : own ? '<span class="owned">보유 · 한 판에 한 번</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-buyitem="${k}" ${can ? '' : 'disabled'}>💗 ${ITEM_COST}로 구매</button>`}
+      ${it.consumable ? `<span class="owned">${it.place ? `게임 중 놓을 때마다 💗 ${ITEM_COST} · 1분 지속` : `게임 중 출격할 때마다 💗 ${ITEM_COST}`}</span>` : own ? '<span class="owned">보유 · 한 판에 한 번</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-buyitem="${k}" ${can ? '' : 'disabled'}>💗 ${ITEM_COST}로 구매</button>`}
     </div></div>`;
   }).join('');
   for (const c of $('affShop').querySelectorAll('[data-icon]')) drawItemIcon(c, c.dataset.icon);
