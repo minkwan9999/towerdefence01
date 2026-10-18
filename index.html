@@ -236,7 +236,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 <div class="app">
   <header>
     <div>
-      <div class="eyebrow">Canyon Hold · 차량 부대 vs 검은 차량 군단</div>
+      <div class="eyebrow">Canyon Hold · 무기 부대 vs 검은 차량 군단</div>
       <h1>협곡 방어전</h1>
     </div>
     <div class="stats" aria-live="polite">
@@ -250,12 +250,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   </header>
 
   <section class="lobby game-lobby" id="lobby" hidden>
-    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나, 차고에서 새 차량을 해제하거나, 맵의 장애물을 치웁니다(하나에 5 AP). 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
+    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나, 무기고에서 새 무기를 해제하거나, 맵의 장애물을 치웁니다(하나에 5 AP). 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
     <div class="section-label">난이도 선택</div>
     <div class="diffs" id="diffs"></div>
     <div class="section-label">패시브 상점 · 업적 포인트로 영구 강화</div>
     <div class="skills" id="skills"></div>
-    <div class="section-label">차고 · 차량 해제</div>
+    <div class="section-label">무기고 · 무기 해제</div>
     <div class="garage" id="garage"></div>
     <p class="fine">기록과 업적 포인트는 이 브라우저에 저장됩니다. 시간은 게임 속도와 상관없이 게임 안의 시간으로 잽니다.</p>
   </section>
@@ -275,7 +275,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
     </div>
 
     <aside>
-      <div class="section-label">차량 배치</div>
+      <div class="section-label">무기 배치</div>
       <div class="shop" id="shop"></div>
       <div class="panel" id="panel"></div>
       <div class="controls">
@@ -286,16 +286,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
       <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
       <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
       <div class="keys">
-        <kbd>1</kbd>–<kbd>8</kbd> 차량 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>C</kbd> 대화 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
+        <kbd>1</kbd>–<kbd>8</kbd> 무기 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>C</kbd> 대화 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
       </div>
     </aside>
   </div>
 </div>
 
-<div class="chat" id="chat" role="dialog" aria-label="차량과 대화" hidden>
+<div class="chat" id="chat" role="dialog" aria-label="무기와 대화" hidden>
   <div class="chat-head">
     <canvas id="chatAvatar" width="76" height="76" aria-hidden="true"></canvas>
-    <div><div class="chat-name" id="chatName">경찰차</div><div class="chat-sub">무전 채널 연결됨</div></div>
+    <div><div class="chat-name" id="chatName">새총</div><div class="chat-sub">무전 채널 연결됨</div></div>
     <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">×</button>
   </div>
   <div class="chat-body" id="chatBody"></div>
@@ -341,14 +341,14 @@ for (let i = 0; i < WAYPOINTS.length - 1; i++) {
 
 // ---------- definitions ----------
 const TOWERS = {
-  police: { name: '경찰차',     ap: 0, cost: 50,  range: 2.6, dmg: 11, rate: .45, color: '#5b8def', desc: '사이렌을 울리며 빠르게 연사합니다. 어디에 두어도 제 몫을 합니다.' },
-  fire:   { name: '소방차',     ap: 0, cost: 70,  range: 2.3, dmg: 6,  rate: .7, slow: .45, slowDur: 1.6, color: '#e2453a', desc: '물대포를 맞은 적은 느려집니다. 화력 좋은 차 앞에 두세요.' },
-  dump:   { name: '덤프트럭',   ap: 10, cost: 90,  range: 2.4, dmg: 30, rate: 1.5, splash: .95, color: '#f0b429', desc: '돌무더기를 쏟아부어 떨어진 자리 주변을 모두 때립니다.' },
-  bumper: { name: '범퍼카',     ap: 10, cost: 60,  range: 1.4, dmg: 14, rate: .9, knock: .6, color: '#ff5fa2', desc: '가까이 온 적을 들이받아 뒤로 밀어냅니다. 길 모퉁이에 좋습니다.' },
-  taxi:   { name: '택시',       ap: 20, cost: 80,  range: 0,   dmg: 0,  rate: 0, income: 15, color: '#f7c600', desc: '싸우지 않습니다. 웨이브를 막을 때마다 요금을 벌어 옵니다.' },
-  crane:  { name: '크레인',     ap: 30, cost: 120, range: 2.0, dmg: 90, rate: 2.4, splash: .6, color: '#e8a317', desc: '철거용 쇠공을 떨어뜨립니다. 느리지만 한 방이 아주 셉니다.' },
-  flume:  { name: '후룸라이드', ap: 40, cost: 130, range: 1.9, dmg: 18, rate: 1.3, pulse: true, slow: .25, slowDur: .8, color: '#4fb3e8', desc: '물보라를 일으켜 범위 안의 적 모두를 적시고 조금 늦춥니다.' },
-  tank:   { name: '탱크',       ap: 60, cost: 160, range: 3.6, dmg: 70, rate: 1.6, color: '#7c8b45', desc: '사거리가 가장 깁니다. 멀리서 강한 포탄을 쏩니다.' },
+  police: { name: '새총',       ap: 0, cost: 50,  range: 2.6, dmg: 11, rate: .45, color: '#d9a066', desc: '작은 돌을 빠르게 연달아 쏩니다. 어디에 두어도 제 몫을 합니다.' },
+  fire:   { name: '느림보 총',  ap: 0, cost: 70,  range: 2.3, dmg: 6,  rate: .7, slow: .45, slowDur: 1.6, color: '#9bd65a', desc: '끈적한 젤리를 맞은 적은 느려집니다. 화력 좋은 무기 앞에 두세요.' },
+  dump:   { name: '소형 대포',  ap: 10, cost: 90,  range: 2.4, dmg: 30, rate: 1.5, splash: .95, color: '#e8955a', desc: '포탄이 떨어진 자리 주변을 모두 때립니다.' },
+  bumper: { name: '백 총',      ap: 10, cost: 60,  range: 1.4, dmg: 14, rate: .9, knock: .6, color: '#ff5fa2', desc: '용수철 힘으로 가까이 온 적을 뒤로 날려 보냅니다. 길 모퉁이에 좋습니다.' },
+  taxi:   { name: '금광',       ap: 20, cost: 80,  range: 0,   dmg: 0,  rate: 0, income: 15, color: '#f7c600', desc: '싸우지 않습니다. 웨이브를 막을 때마다 금을 캐 옵니다.' },
+  crane:  { name: '대형 대포',  ap: 30, cost: 120, range: 2.0, dmg: 90, rate: 2.4, splash: .6, color: '#c98a4a', desc: '무거운 포탄을 쏩니다. 느리지만 한 방이 아주 셉니다.' },
+  flume:  { name: '빙결총',     ap: 40, cost: 130, range: 1.9, dmg: 18, rate: 1.3, pulse: true, freeze: .5, color: '#86d0ee', desc: '냉기를 뿜어 범위 안의 적 모두를 잠깐 얼려 멈춰 세웁니다.' },
+  tank:   { name: '강력 새총',  ap: 60, cost: 160, range: 3.6, dmg: 70, rate: 1.6, color: '#e2b54a', desc: '사거리가 가장 깁니다. 멀리서 큰 돌을 세게 날립니다.' },
 };
 const DIFF_STEP = 1.2;
 const DIFFS = [
@@ -372,8 +372,8 @@ function saveProg() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(prog))
 const isUnlocked = type => prog.unlocked.includes(type);
 // 패시브 스킬: 업적 포인트로 단계를 올리면 모든 판에 계속 적용됩니다. 단계 n으로 올리는 비용은 base × n.
 const SKILLS = [
-  { id: 'dmg',  icon: '💥', name: '공격력 증가',     per: 5,  max: 5, base: 6, fmt: v => `모든 차량 공격력 +${v}%` },
-  { id: 'aspd', icon: '⚡', name: '공격 속도 증가',  per: 5,  max: 5, base: 6, fmt: v => `모든 차량 공격 속도 +${v}%` },
+  { id: 'dmg',  icon: '💥', name: '공격력 증가',     per: 5,  max: 5, base: 6, fmt: v => `모든 무기 공격력 +${v}%` },
+  { id: 'aspd', icon: '⚡', name: '공격 속도 증가',  per: 5,  max: 5, base: 6, fmt: v => `모든 무기 공격 속도 +${v}%` },
   { id: 'def',  icon: '🛡️', name: '성문 방어력 증가', per: 2,  max: 5, base: 4, fmt: v => `성문 내구도 +${v} (시작 20)` },
   { id: 'slow', icon: '🐢', name: '적 속도 감소',    per: 3,  max: 5, base: 5, fmt: v => `모든 적 이동 속도 -${v}%` },
   { id: 'sell', icon: '♻️', name: '판매 회수율 증가', per: 5,  max: 5, base: 3, fmt: v => `판매 시 돌려받는 비율 +${v}%p (기본 50%)` },
@@ -402,6 +402,7 @@ function stats(t) {
     slowDur: d.slowDur || 0,
     splash: d.splash ? (d.splash + .15 * k) * T : 0,
     knock: d.knock ? (d.knock + .15 * k) * T : 0,
+    freeze: d.freeze ? d.freeze + .1 * k : 0,
     income: d.income ? Math.round(d.income * [1, 1.8, 2.8][k] * (t.buff || 1)) : 0,
   };
 }
@@ -487,7 +488,7 @@ const bg = document.createElement('canvas'); bg.width = W * dpr; bg.height = H *
 })();
 
 // ---------- drawing ----------
-// vehicles are drawn top-down, facing +x. Enemies reuse them with PAINT turning every body color black.
+// enemy vehicles are drawn top-down, facing +x, with PAINT turning every body color black with PAINT turning every body color black.
 let PAINT = null;
 const P = c => PAINT ? PAINT(c) : c;
 function blackPaint(flash) {
@@ -564,29 +565,99 @@ function drawVehicle(g, type, off) {
     g.fillStyle = P('#e2b54a'); circle(g, -3, 0, 1.6); g.fill();
   }
 }
+// towers are weapons drawn top-down; rotating ones face +x
+function drawWeapon(g, type, ang, t) {
+  const d = TOWERS[type];
+  if (type === 'taxi') { // 금광: 바위 언덕, 갱도 입구, 금이 실린 수레
+    g.fillStyle = '#5b4a3a'; g.strokeStyle = '#2a2018'; g.lineWidth = 1.5;
+    g.beginPath(); g.ellipse(0, 1, 21, 17, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#7a6550'; g.beginPath(); g.ellipse(-6, -5, 12, 8, -.3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#6b4526'; rr(g, -10, -8, 20, 17, 7); g.fill();
+    g.fillStyle = '#0d0a08'; rr(g, -6.5, -4.5, 13, 13, 5); g.fill();
+    g.strokeStyle = '#9aa0a5'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-4, 9); g.lineTo(-6, 20); g.moveTo(4, 9); g.lineTo(6, 20); g.stroke();
+    g.fillStyle = '#4d5459'; g.strokeStyle = '#1e2225'; rr(g, 7, 8, 14, 9, 2); g.fill(); g.stroke();
+    g.fillStyle = d.color; circle(g, 10.5, 8, 3); g.fill(); circle(g, 16, 7.5, 3.4); g.fill(); circle(g, 13, 5, 2.6); g.fill();
+    const tw = (Math.sin(time * 4) + 1) / 2;
+    g.strokeStyle = `rgba(255,250,215,${.3 + .7 * tw})`; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(17, -1); g.lineTo(17, 5); g.moveTo(14, 2); g.lineTo(20, 2); g.stroke();
+    return;
+  }
+  if (type === 'flume') { // 빙결총: 천천히 도는 눈꽃 방출기
+    g.fillStyle = '#18323f'; g.strokeStyle = '#0c1d26'; g.lineWidth = 2;
+    g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; g.lineTo(Math.cos(a) * 18, Math.sin(a) * 18); } g.closePath(); g.fill(); g.stroke();
+    g.rotate(time * .6);
+    g.strokeStyle = d.color; g.lineWidth = 2.6; g.lineCap = 'round'; g.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2, cx = Math.cos(a), cy = Math.sin(a), px = -cy, py = cx;
+      g.moveTo(0, 0); g.lineTo(cx * 14, cy * 14);
+      g.moveTo(cx * 8, cy * 8); g.lineTo(cx * 11 + px * 4, cy * 11 + py * 4);
+      g.moveTo(cx * 8, cy * 8); g.lineTo(cx * 11 - px * 4, cy * 11 - py * 4);
+    }
+    g.stroke();
+    g.shadowColor = d.color; g.shadowBlur = 10; g.fillStyle = '#eefaff'; circle(g, 0, 0, 4.5); g.fill(); g.shadowBlur = 0;
+    return;
+  }
+  let off = 0;
+  if (type === 'bumper' && t && t.bump > 0) off = Math.sin(t.bump / .18 * Math.PI) * 7;
+  g.rotate(ang);
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(3, 4, 19, 13, 0, 0, Math.PI * 2); g.fill();
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  if (type === 'police' || type === 'tank') { // 새총 · 강력 새총
+    const big = type === 'tank', s = big ? 1.25 : 1;
+    g.scale(s, s);
+    if (big) {
+      g.strokeStyle = '#2f3438'; g.lineWidth = 3; g.beginPath();
+      for (const a of [Math.PI * .75, Math.PI, Math.PI * 1.25]) { g.moveTo(-4, 0); g.lineTo(-4 + Math.cos(a) * 12, Math.sin(a) * 12); } g.stroke();
+      g.fillStyle = '#3a4045'; circle(g, -4, 0, 6); g.fill();
+    } else { g.fillStyle = '#4a3420'; circle(g, -4, 0, 9); g.fill(); }
+    g.strokeStyle = big ? '#8c959c' : '#8a5a2e'; g.lineWidth = big ? 4.5 : 4;
+    g.beginPath(); g.moveTo(-12, 0); g.lineTo(0, 0); g.moveTo(0, 0); g.lineTo(9, -9); g.moveTo(0, 0); g.lineTo(9, 9); g.stroke();
+    if (big) { g.fillStyle = d.color; circle(g, 9, -9, 2.6); g.fill(); circle(g, 9, 9, 2.6); g.fill(); }
+    g.strokeStyle = big ? '#e65a4f' : '#d8c08a'; g.lineWidth = big ? 2.2 : 1.6;
+    g.beginPath(); g.moveTo(9, -9); g.lineTo(-6, 0); g.lineTo(9, 9); g.stroke();
+    g.fillStyle = '#5a3a1e'; rr(g, -9, -3, 5, 6, 1.5); g.fill();
+    g.fillStyle = '#bdb6a8'; circle(g, -6, 0, big ? 3.2 : 2.6); g.fill();
+  } else if (type === 'fire') { // 느림보 총: 끈적이 젤리를 쏘는 통 달린 총
+    g.fillStyle = '#3d4a3a'; g.strokeStyle = '#141814'; g.lineWidth = 1.5;
+    rr(g, 8, -5, 11, 10, 3); g.fill(); g.stroke();
+    g.fillStyle = '#c8f59a'; circle(g, 19, 0, 3.4); g.fill();
+    g.fillStyle = d.color; rr(g, -15, -8, 25, 16, 6); g.fill(); g.stroke();
+    g.fillStyle = '#4f8f33'; circle(g, -4, 0, 6.5); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.45)'; circle(g, -6, -2.5, 2); g.fill();
+    g.fillStyle = d.color; circle(g, 21, 4, 2); g.fill(); circle(g, -15, 6, 1.6); g.fill();
+  } else if (type === 'dump' || type === 'crane') { // 소형 대포 · 대형 대포
+    const big = type === 'crane';
+    const L = big ? 36 : 26, Wd = big ? 18 : 12, wheelY = big ? 16 : 12;
+    g.fillStyle = '#3b2614'; rr(g, -14, -wheelY - 3, 18, 6, 2); g.fill(); rr(g, -14, wheelY - 3, 18, 6, 2); g.fill();
+    g.strokeStyle = '#7a5230'; g.lineWidth = 1; g.beginPath(); for (let i = -12; i < 4; i += 4) { g.moveTo(i, -wheelY - 3); g.lineTo(i, -wheelY + 3); g.moveTo(i, wheelY - 3); g.lineTo(i, wheelY + 3); } g.stroke();
+    g.fillStyle = big ? '#5e3f24' : '#7a5230'; g.strokeStyle = '#21150a'; g.lineWidth = 1.5; rr(g, -16, -wheelY + 3, 20, (wheelY - 3) * 2, 3); g.fill(); g.stroke();
+    g.fillStyle = big ? '#a8743a' : '#2c2c31'; rr(g, -8, -Wd / 2, L, Wd, Wd / 2); g.fill(); g.stroke();
+    g.fillStyle = big ? '#7a4f22' : '#45454c'; g.fillRect(L - 14, -Wd / 2, 3, Wd); g.fillRect(2, -Wd / 2, 3, Wd);
+    rr(g, L - 10, -Wd / 2 - 2, 5, Wd + 4, 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(-4, -Wd / 2 + 2, L - 8, 2);
+    if (big) { g.fillStyle = '#e2b54a'; for (const rx of [-3, 8]) { circle(g, rx, -Wd / 2 + 3, 1.3); g.fill(); circle(g, rx, Wd / 2 - 3, 1.3); g.fill(); } }
+  } else if (type === 'bumper') { // 백 총: 용수철로 뻥 밀어내는 나팔 총
+    g.translate(off, 0);
+    g.fillStyle = '#3a3f44'; g.strokeStyle = '#141414'; g.lineWidth = 1.5; rr(g, -15, -7, 20, 14, 4); g.fill(); g.stroke();
+    g.strokeStyle = '#c9ced2'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(-13, 0);
+    for (let i = 0; i < 6; i++) g.lineTo(-11 + i * 2.6, i % 2 ? 5 : -5); g.stroke();
+    g.fillStyle = d.color; g.strokeStyle = '#3a1428'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(4, -6); g.lineTo(20, -14); g.lineTo(20, 14); g.lineTo(4, 6); g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(18, -10); g.lineTo(18, 10); g.stroke();
+  }
+}
+
 function drawTower(g, type, x, y, lv, ang, t) {
   const d = TOWERS[type];
   g.save(); g.translate(x, y);
-  // parking pad
+  // weapon pad
   g.fillStyle = '#2b3230'; rr(g, -26, -26, 52, 52, 6); g.fill();
   g.strokeStyle = '#3f4945'; g.lineWidth = 1.5; g.stroke();
   g.strokeStyle = 'rgba(235,230,211,.55)'; g.lineWidth = 2;
   g.beginPath(); for (const [cx, cy, dx, dy] of [[-22, -22, 1, 1], [22, -22, -1, 1], [-22, 22, 1, -1], [22, 22, -1, -1]]) { g.moveTo(cx + dx * 7, cy); g.lineTo(cx, cy); g.lineTo(cx, cy + dy * 7); } g.stroke();
 
   g.save();
-  if (type === 'flume') {
-    g.strokeStyle = '#2a6f99'; g.lineWidth = 9; g.beginPath(); g.ellipse(0, 0, 17, 13, 0, 0, Math.PI * 2); g.stroke();
-    g.strokeStyle = d.color; g.lineWidth = 6; g.stroke();
-    g.fillStyle = '#5c7f5a'; g.beginPath(); g.ellipse(0, 0, 9, 6, 0, 0, Math.PI * 2); g.fill();
-    const a = time * 1.6, bx = Math.cos(a) * 17, by = Math.sin(a) * 13;
-    g.translate(bx, by); g.rotate(Math.atan2(Math.cos(a) * 13, -Math.sin(a) * 17));
-    g.fillStyle = '#8a5a2e'; g.strokeStyle = '#3b240f'; g.lineWidth = 1.2; rr(g, -8, -4, 16, 8, 4); g.fill(); g.stroke();
-    g.fillStyle = '#ffd7a8'; circle(g, -2, 0, 2); g.fill(); circle(g, 3, 0, 2); g.fill();
-  } else {
-    let off = 0;
-    if (type === 'bumper' && t && t.bump > 0) off = Math.sin(t.bump / .18 * Math.PI) * 8;
-    g.rotate(ang); drawVehicle(g, type, off);
-  }
+  drawWeapon(g, type, ang, t);
   g.restore();
   g.fillStyle = '#e2b54a';
   for (let i = 0; i < lv; i++) { circle(g, -(lv - 1) * 4 + i * 8, 22, 2.4); g.fill(); }
@@ -601,7 +672,11 @@ function drawEnemy(g, e) {
   drawVehicle(g, d.car, 0);
   PAINT = null;
   g.restore();
-  if (e.slowT > 0) { g.strokeStyle = 'rgba(134,208,238,.85)'; g.lineWidth = 2; circle(g, e.x, e.y, r + 3); g.stroke(); }
+  if (e.slowT > 0 && e.slowF >= 1) {
+    g.fillStyle = 'rgba(190,235,255,.45)'; g.strokeStyle = 'rgba(235,250,255,.9)'; g.lineWidth = 1.5;
+    rr(g, e.x - r - 3, e.y - r * .8, (r + 3) * 2, r * 1.6, 5); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.moveTo(e.x - r + 2, e.y - r * .4); g.lineTo(e.x - r + 8, e.y - r * .7); g.stroke();
+  } else if (e.slowT > 0) { g.strokeStyle = 'rgba(155,214,90,.85)'; g.lineWidth = 2; circle(g, e.x, e.y, r + 3); g.stroke(); }
   if (e.hp < e.maxHp) {
     const w = Math.max(22, r * 2), p = Math.max(0, e.hp / e.maxHp);
     g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(e.x - w / 2, e.y - r - 10, w, 4);
@@ -773,13 +848,13 @@ function fire(t, e, st) {
   if (t.type === 'police' || t.type === 'fire' || t.type === 'tank') {
     const k = { police: 'bullet', fire: 'drop', tank: 'shell' }[t.type], sp = { police: 700, fire: 420, tank: 820 }[t.type];
     S.proj.push({ k, x: nx, y: ny, tg: e, tx: e.x, ty: e.y, sp, dmg: st.dmg, slow: st.slow, slowDur: st.slowDur, src: t, ang: t.ang });
-    if (t.type === 'tank') ring(nx, ny, 3, 14, '#ffcf6b', .18);
+    if (t.type === 'tank') ring(nx, ny, 3, 14, '#e2b54a', .18);
   } else if (t.type === 'dump' || t.type === 'crane') {
     const crane = t.type === 'crane';
     const dist = Math.hypot(e.x - t.x, e.y - t.y), dur = crane ? .45 : Math.max(.3, dist / 340);
     const sp = espeed(e);
     const p = posAt(e.d + sp * dur);
-    const sx = crane ? t.x + Math.cos(t.ang) * 30 : t.x, sy = crane ? t.y + Math.sin(t.ang) * 30 : t.y;
+    const mz = crane ? 30 : 20, sx = t.x + Math.cos(t.ang) * mz, sy = t.y + Math.sin(t.ang) * mz;
     S.proj.push({ k: crane ? 'wreck' : 'rock', sx, sy, tx: p.x, ty: p.y, x: sx, y: sy, t: 0, dur, arc: crane ? 26 : 46, dmg: st.dmg, splash: st.splash, src: t });
   } else if (t.type === 'bumper') {
     hurt(e, st.dmg, t); t.bump = .18;
@@ -788,9 +863,9 @@ function fire(t, e, st) {
   } else if (t.type === 'flume') {
     for (const o of S.enemies) {
       if (!o.alive || (o.x - t.x) ** 2 + (o.y - t.y) ** 2 > st.range * st.range) continue;
-      hurt(o, st.dmg, t); if (o.alive) slowDown(o, st.slow, st.slowDur);
+      hurt(o, st.dmg, t); if (o.alive) slowDown(o, 1, st.freeze * (o.type === 'boss' ? .5 : 1));
     }
-    ring(t.x, t.y, 10, st.range, '#8fd6ff', .45);
+    ring(t.x, t.y, 10, st.range, '#d6f4ff', .45);
   }
 }
 
@@ -844,7 +919,7 @@ function update(dt) {
           hurt(p.tg, p.dmg, p.src);
           if (p.k === 'drop' && p.tg.alive) slowDown(p.tg, p.slow, p.slowDur);
         }
-        if (p.k === 'drop') ring(p.tx, p.ty, 4, 16, '#86d0ee', .25);
+        if (p.k === 'drop') ring(p.tx, p.ty, 4, 16, '#9bd65a', .25);
         if (p.k === 'shell') { ring(p.tx, p.ty, 4, 22, '#ffcf6b', .25); sparks(p.tx, p.ty, '#ffcf6b', 5); }
       } else { p.x += dx / dist * step; p.y += dy / dist * step; }
     }
@@ -859,7 +934,7 @@ function update(dt) {
     floatText(W / 2, H / 2, '웨이브 ' + S.wave + ' 방어 · 보너스 +' + bonus, '#e2b54a');
     S.fx[S.fx.length - 1].life = S.fx[S.fx.length - 1].max = 2;
     onWaveCleared();
-    for (const t of S.towers) if (t.type === 'taxi') { const fare = stats(t).income; S.gold += fare; t.earned = (t.earned || 0) + fare; floatText(t.x, t.y - 26, '요금 +' + fare, '#f7c600'); }
+    for (const t of S.towers) if (t.type === 'taxi') { const fare = stats(t).income; S.gold += fare; t.earned = (t.earned || 0) + fare; floatText(t.x, t.y - 26, '채굴 +' + fare, '#f7c600'); }
     if (S.wave >= MAX_WAVE) { endGame(true); return; }
     if (document.getElementById('autoChk').checked) S.autoT = 2;
   }
@@ -914,19 +989,18 @@ function render() {
   for (const p of S.proj) {
     if (p.k === 'bullet' || p.k === 'drop' || p.k === 'shell') {
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
-      if (p.k === 'bullet') { ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(3, 0); ctx.stroke(); }
-      else if (p.k === 'drop') { ctx.fillStyle = 'rgba(143,214,255,.5)'; ctx.beginPath(); ctx.ellipse(-6, 0, 9, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#dff4ff'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill(); }
-      else { ctx.fillStyle = 'rgba(255,170,60,.6)'; ctx.fillRect(-12, -1.5, 8, 3); ctx.fillStyle = '#3a3a33'; rr(ctx, -4, -2.5, 9, 5, 2); ctx.fill(); }
+      if (p.k === 'bullet') { ctx.fillStyle = '#c9c2b4'; ctx.strokeStyle = '#4a453c'; ctx.lineWidth = 1; circle(ctx, 0, 0, 3); ctx.fill(); ctx.stroke(); }
+      else if (p.k === 'drop') { ctx.fillStyle = 'rgba(155,214,90,.45)'; ctx.beginPath(); ctx.ellipse(-6, 0, 8, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b5ec78'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 4, 0, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.strokeStyle = 'rgba(235,230,211,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(-5, 0); ctx.stroke(); ctx.fillStyle = '#a39c90'; ctx.strokeStyle = '#3f3a33'; ctx.lineWidth = 1.2; circle(ctx, 0, 0, 5); ctx.fill(); ctx.stroke(); }
       ctx.restore();
     } else if (p.k === 'rock' || p.k === 'wreck') {
       const hy = p.y - (p.h || 0);
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
       if (p.k === 'wreck') {
-        ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(p.sx, p.sy); ctx.lineTo(p.x, hy); ctx.stroke();
         ctx.fillStyle = '#34383b'; circle(ctx, p.x, hy, 8); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,.25)'; circle(ctx, p.x - 3, hy - 3, 2.5); ctx.fill();
       } else {
-        ctx.fillStyle = '#8b6b45'; ctx.beginPath(); ctx.moveTo(p.x - 6, hy); ctx.lineTo(p.x - 2, hy - 6); ctx.lineTo(p.x + 5, hy - 4); ctx.lineTo(p.x + 6, hy + 3); ctx.lineTo(p.x, hy + 6); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#26262b'; circle(ctx, p.x, hy, 5); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.3)'; circle(ctx, p.x - 1.5, hy - 1.5, 1.6); ctx.fill();
       }
     }
   }
@@ -1026,7 +1100,7 @@ function refreshUI() {
   if (obsView && S.obst.has(obsView)) {
     const o = S.obst.get(obsView), od = OBST_TYPES[o.type], can = prog.ap >= CLEAR_COST;
     key = 'o' + obsView + prog.ap;
-    html = `<h3>${od.name} <span class="lv">장애물</span></h3><p>${od.desc} 이 칸에는 차량을 세울 수 없습니다.</p>
+    html = `<h3>${od.name} <span class="lv">장애물</span></h3><p>${od.desc} 이 칸에는 무기를 세울 수 없습니다.</p>
       <dl class="kv"><dt>제거 비용</dt><dd>${CLEAR_COST} AP</dd><dt>보유 업적 포인트</dt><dd>${prog.ap} AP</dd><dt>이 난이도 남은 장애물</dt><dd>${S.obst.size}개</dd></dl>
       <p>${can ? '치우면 이 난이도에서는 영구히 사라집니다.' : '업적 포인트가 ' + (CLEAR_COST - prog.ap) + ' 부족합니다.'}</p>
       <div class="row"><button class="btn primary grow" type="button" data-act="clear" ${can ? '' : 'disabled'}>${CLEAR_COST} AP로 치우기</button><button class="btn" type="button" data-act="cancel">닫기</button></div>`;
@@ -1041,7 +1115,7 @@ function refreshUI() {
     const d = TOWERS[build];
     key = 'b' + build + (S.gold >= d.cost);
     html = `<h3>${d.name} <span class="lv">${d.cost} 금화</span></h3><p>${d.desc}</p>
-      <dl class="kv">${d.income ? `<dt>웨이브당 요금</dt><dd>${d.income}</dd>` : `<dt>피해</dt><dd>${d.dmg}${d.splash ? ' · 범위' : ''}${d.pulse ? ' · 주변 전체' : ''}</dd><dt>사거리</dt><dd>${d.range} 칸</dd><dt>공격 간격</dt><dd>${d.rate}초</dd>`}${d.slow ? `<dt>둔화</dt><dd>${Math.round(d.slow * 100)}% · ${d.slowDur}초</dd>` : ''}${d.knock ? `<dt>밀쳐내기</dt><dd>${d.knock} 칸</dd>` : ''}</dl>
+      <dl class="kv">${d.income ? `<dt>웨이브당 채굴</dt><dd>${d.income}</dd>` : `<dt>피해</dt><dd>${d.dmg}${d.splash ? ' · 범위' : ''}${d.pulse ? ' · 주변 전체' : ''}</dd><dt>사거리</dt><dd>${d.range} 칸</dd><dt>공격 간격</dt><dd>${d.rate}초</dd>`}${d.slow ? `<dt>둔화</dt><dd>${Math.round(d.slow * 100)}% · ${d.slowDur}초</dd>` : ''}${d.knock ? `<dt>밀쳐내기</dt><dd>${d.knock} 칸</dd>` : ''}${d.freeze ? `<dt>정지</dt><dd>${d.freeze}초 (보스는 절반)</dd>` : ''}</dl>
       <p>${S.gold >= d.cost ? '길이 아닌 빈 칸을 눌러 배치하세요.' : '금화가 ' + (d.cost - S.gold) + ' 부족합니다.'}</p>
       <div class="row"><button class="btn grow" type="button" data-act="cancel">취소</button></div>`;
   } else if (sel) {
@@ -1050,8 +1124,8 @@ function refreshUI() {
     key = 's' + S.towers.indexOf(sel) + (sel.buff || 1) + '|' + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c) + '|' + (sel.unread || 0);
     const up = (a, b) => nx ? ` <span class="up">→ ${b}</span>` : '';
     html = `<h3>${d.name} <span class="lv">Lv.${sel.lv}${max ? ' · 최대' : ''}</span></h3>
-      <dl class="kv">${st.income ? `<dt>웨이브당 요금</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>번 요금</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
-      ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
+      <dl class="kv">${st.income ? `<dt>웨이브당 채굴</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>캐낸 금화</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
+      ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.freeze ? `<dt>정지</dt><dd>${st.freeze.toFixed(1)}초${up(0, nx && nx.freeze.toFixed(1) + '초')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
       <dt>처치</dt><dd>${sel.kills}</dd>`}<dt>들인 금화</dt><dd>${sel.invested}</dd>${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
       <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="설치비와 강화비 합계의 ${Math.round(sellRate() * 100)}%를 돌려받습니다">판매 <span class="mono">+${refund(sel)}</span></button></div>
       <button class="btn" type="button" data-act="chat">📻 대화하기${sel.unread ? ` <span class="mono">(${sel.unread})</span>` : ''}</button>`;
@@ -1061,7 +1135,7 @@ function refreshUI() {
     key = 'i' + nextW + S.waveActive;
     html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
-      <p>적군은 우리와 똑같은 차량을 검게 칠한 것입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 차를 누르면 강화, 판매(들인 금화의 ${Math.round(sellRate() * 100)}%), 대화하기를 고를 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 차가 퀴즈를 냅니다.</p>${passiveSummary()}`;
+      <p>적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화, 판매(들인 금화의 ${Math.round(sellRate() * 100)}%), 대화하기를 고를 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 무기가 퀴즈를 냅니다.</p>${passiveSummary()}`;
   }
   if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
 }
@@ -1241,26 +1315,26 @@ const QUIZ = [
   ['신호등에서 "멈춤"을 뜻하는 색은?', '빨강', ['초록', '노랑', '파랑']],
 ];
 const PERSONA = {
-  police: { hi: ['충성! 경찰차 출동했습니다 🚓', '근무 중이지만 수다는 환영이에요. 저 눌러서 말 걸어 주세요!'],
-    me: '이 길목 치안 담당 경찰차예요. 사이렌 소리가 제 자랑이죠 🚨', food: '근무 중엔 역시 도넛이죠 🍩', hobby: '취미는 순찰… 아니 드라이브요 ㅎㅎ', dream: '무사고로 1만 일 근무하는 게 꿈이에요!', age: '나이는 비밀, 순찰 경력은 꽤 길어요 👮' },
-  fire: { hi: ['안녕하세요! 소방차예요 🚒', '불 얘기 말고 다른 얘기도 좋아요. 심심하면 불러 주세요!'],
-    me: '물탱크 가득 실은 소방차예요. 사다리 타는 게 특기!', food: '시원한 물이면 충분해요 💧 …사실 라면은 좋아해요', hobby: '호스 돌돌 마는 거 은근 재밌어요', dream: '불 하나 없는 평화로운 하루가 꿈이에요', age: '사다리 길이는 알려 줘도 나이는 비밀!' },
-  dump: { hi: ['덤프트럭 도착~ 🚛', '돌 쏟을 준비 끝! 쉬는 시간엔 말 걸어도 돼요.'],
-    me: '짐칸 가득 돌 싣고 다니는 덤프트럭이에요. 힘 하나는 자신 있죠', food: '저는 경유 든든하게 먹으면 돼요 ⛽', hobby: '모래 쌓아서 산 만들기요 ⛰️', dream: '언젠가 진짜 큰 다리 짓는 현장에 가 보고 싶어요', age: '바퀴 수로 치면 꽤 어른이에요 ㅋㅋ' },
-  bumper: { hi: ['범퍼카 등장! 🎢', '쿵쿵 박는 거 말고 수다도 잘 떨어요. 놀아 줘요!'],
-    me: '놀이공원에서 온 범퍼카예요! 부딪히는 게 제 일이자 놀이죠', food: '솜사탕이랑 츄러스요 🍭', hobby: '빙글빙글 돌기! 어지러운 게 좋아요', dream: '세상에서 제일 신나는 범퍼카 되기!', age: '마음은 영원한 열 살이에요 ㅎㅎ' },
-  taxi: { hi: ['손님, 어디로 모실까요? 🚕', '싸움 대신 요금 벌어 올게요. 가는 길에 말동무 해 주세요!'],
-    me: '협곡 전용 택시예요. 기본요금 받고 열심히 달리죠', food: '기사식당 제육볶음이 최고예요 🍚', hobby: '라디오 들으면서 손님이랑 수다 떨기요', dream: '전국 일주 손님 한번 태워 보는 거요!', age: '주행거리는 묻지 말아 주세요 😅' },
-  crane: { hi: ['크레인입니다 🏗️', '높은 데서 보면 다 보여요. 궁금한 거 물어보세요.'],
-    me: '무거운 거 번쩍 드는 크레인이에요. 쇠공 떨어뜨리는 게 특기', food: '저는 바람만 맞아도 배불러요 🍃', hobby: '높은 데서 구름 구경하기', dream: '세계에서 제일 높은 빌딩 꼭대기에 올라가 보는 거요', age: '팔 길이만큼 나이도 많아요 ㅎㅎ' },
-  flume: { hi: ['후룸라이드 개장했어요! 💦', '물 튀기는 거 좋아하면 저랑 얘기해요!'],
-    me: '통나무 배 타고 물길 도는 후룸라이드예요. 젖을 각오 하세요!', food: '여름엔 무조건 빙수죠 🍧', hobby: '물보라 크게 만들기 연습이요', dream: '세상에서 제일 높은 낙차 만들기!', age: '개장한 지는 꽤 됐어요. 아직 쌩쌩해요' },
-  tank: { hi: ['탱크 배치 완료. 🪖', '말수는 적지만 대화는 받습니다.'],
-    me: '장갑 두꺼운 탱크입니다. 멀리 있는 적도 맞힙니다', food: '전투식량… 의외로 맛있습니다', hobby: '포신 닦기. 반짝여야 기분이 좋습니다', dream: '포탄 한 발 안 쏘는 평화로운 날', age: '군번은 기밀입니다' },
+  police: { hi: ['새총 장전 완료! 🪀', '작은 돌멩이도 제가 쏘면 아파요. 심심하면 대화하기 눌러 주세요!'],
+    me: '나뭇가지로 만든 새총이에요. 빠르게 퉁퉁 쏘는 게 특기!', food: '돌멩이 말고는 안 먹어요… 농담이에요, 젤리 좋아해요 🍬', hobby: '동글동글한 돌 고르기요', dream: '언젠가 강력 새총으로 크는 거요!', age: '나뭇가지 나이로는 꽤 됐어요 🌳' },
+  fire: { hi: ['느림보 총이에요~ 🐌', '천천히… 아주 천천히… 말 걸어 주세요…'],
+    me: '끈적한 젤리를 쏴서 적을 느리게 만들어요. 저도 좀 느긋한 편이죠', food: '말랑한 젤리랑 푸딩이요 🍮', hobby: '낮잠 자기… 그리고 또 낮잠', dream: '세상 모든 게 천천히 흘러가게 하는 거요', age: '나이 세다가 잠들었어요 😴' },
+  dump: { hi: ['소형 대포 준비 완료! 💣', '작지만 한 방은 화끈해요.'],
+    me: '작은 대포예요. 포탄이 떨어진 자리 주변을 다 날려 버리죠', food: '매콤한 떡볶이요! 화끈한 게 좋아요 🌶️', hobby: '포신 반짝반짝 닦기', dream: '대형 대포처럼 커지는 거요!', age: '바퀴 단 지 얼마 안 됐어요' },
+  bumper: { hi: ['백 총이에요! 💨', '다가오면 뻥! 하고 뒤로 날려 버릴게요.'],
+    me: '용수철 힘으로 적을 뒤로 밀어내는 백 총이에요', food: '팝콘이요! 펑펑 터지는 게 저랑 닮았어요 🍿', hobby: '용수철 감기', dream: '보스도 한 방에 날려 보내는 거요', age: '용수철 탄성은 아직 쌩쌩해요' },
+  taxi: { hi: ['금광 개장! ⛏️', '싸움은 못 해도 금은 캐 올게요. 쉴 때 말 걸어 주세요.'],
+    me: '반짝이는 금을 캐는 금광이에요. 웨이브 끝날 때마다 금을 보내 드려요', food: '광부 아저씨들 도시락 냄새가 최고예요 🍱', hobby: '금덩이 크기 재기', dream: '다이아몬드 한 번 캐 보는 거요 💎', age: '수천 년 된 바위 속이라… 나이는 비밀' },
+  crane: { hi: ['대형 대포, 포문 열었습니다. 💥', '느리지만 한 방에 끝냅니다.'],
+    me: '아주 무거운 포탄을 쏘는 대형 대포예요', food: '든든한 국밥이요. 포탄만큼 묵직하게', hobby: '포탄 광내기', dream: '전설의 포탄 한 발', age: '청동에 녹이 슬기 시작한 나이랄까요' },
+  flume: { hi: ['빙결총 가동! ❄️', '가까이 오면 꽁꽁 얼려 버릴게요.'],
+    me: '차가운 냉기를 뿜어서 적을 잠깐 얼려 세우는 빙결총이에요', food: '빙수랑 아이스크림이요 🍨', hobby: '눈꽃 모양 만들기', dream: '여름에도 녹지 않는 거요', age: '빙하기 때부터… 는 농담이에요 ㅎㅎ' },
+  tank: { hi: ['강력 새총, 조준 완료. 🎯', '멀리 있는 적도 맞힙니다.'],
+    me: '쇠로 만든 거대한 새총입니다. 사거리가 가장 깁니다', food: '든든한 고기요. 힘을 써야 하니까', hobby: '고무줄 당기기 운동', dream: '하늘 끝까지 돌 날려 보기', age: '작은 새총 시절은 기억도 안 나요' },
 };
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const statusLine = t => t.type === 'taxi'
-  ? `지금 웨이브 ${S.wave}이고, 저는 요금 ${t.earned || 0} 벌었어요 🚕`
+  ? `지금 웨이브 ${S.wave}이고, 저는 금 ${t.earned || 0} 캤어요 ⛏️`
   : `지금 웨이브 ${S.wave}! 저는 검은 차 ${t.kills}대 잡았어요 💪`;
 const TALK = [
   { k: ['안녕', '하이', 'ㅎㅇ', '반가', 'hello', 'hi'], r: () => pick(['안녕하세요! 😊', '반가워요! 오늘 기분 어때요?', '네 안녕하세요~']) },
@@ -1392,9 +1466,9 @@ function refreshComposer() {
     const items = p.kind === 'quiz'
       ? p.q.options.map(o => ({ label: o }))
       : [
-        { key: 'gold', icon: '💰', label: `금화 +${p.gold}`, sub: '바로 받아서 차량을 더 세워요' },
+        { key: 'gold', icon: '💰', label: `금화 +${p.gold}`, sub: '바로 받아서 무기를 더 세워요' },
         { key: 'slow', icon: '🐢', label: '적 속도 20% 감소', sub: '전투 중 30초 동안 모든 적이 느려져요' },
-        { key: 'buff', icon: t.type === 'taxi' ? '🧾' : '💥', label: t.type === 'taxi' ? '이 택시 요금 +25%' : `${TOWERS[t.type].name} 공격력 +25%`, sub: '이 차량에게 영구히 적용돼요' },
+        { key: 'buff', icon: t.type === 'taxi' ? '⛏️' : '💥', label: t.type === 'taxi' ? '이 금광 채굴량 +25%' : `${TOWERS[t.type].name} 공격력 +25%`, sub: '이 무기에게 영구히 적용돼요' },
       ];
     items.forEach((it, i) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
@@ -1462,7 +1536,7 @@ async function onChip(t, it) {
     if (it.key === 'slow') S.slowAll = Math.max(S.slowAll, 0) + 30;
     if (it.key === 'buff' && S.towers.includes(t)) { t.buff = (t.buff || 1) + .25; ring(t.x, t.y, 12, 40, '#fee500', .5); }
     panelKey = '';
-    await say(t, { gold: `금화 ${p.gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: t.type === 'taxi' ? '요금 할증 붙였어요! 더 벌어 올게요 🚕' : '힘이 솟네요! 더 세게 쏠게요 💪' }[it.key]);
+    await say(t, { gold: `금화 ${p.gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: t.type === 'taxi' ? '곡괭이 새로 갈았어요! 금 더 캐 올게요 ⛏️' : '힘이 솟네요! 더 세게 쏠게요 💪' }[it.key]);
     await cooldown(t);
   }
   t.busy = false;
