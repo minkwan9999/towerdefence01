@@ -720,7 +720,7 @@ function drawEnemy(g, e) {
 
 // ---------- obstacles ----------
 // 난이도마다 길 가까이에 차량을 세울 수 없는 장애물이 놓입니다. 업적 포인트로 하나씩 영구히 치울 수 있습니다.
-const CLEAR_COST = 5;
+const CLEAR_COST = 5, OBST_COUNT = 20;
 const OBST_TYPES = {
   rock:   { name: '바위',        desc: '협곡에서 굴러떨어진 커다란 바위입니다.' },
   wreck:  { name: '폐차',        desc: '녹슨 채로 버려진 고물 자동차입니다.' },
@@ -739,7 +739,7 @@ function obstacleLayout(diff) {
   }
   // 길에 바로 붙은 좋은 자리를 조금 더 자주 막습니다.
   cells.sort((a, b) => (a[2] - b[2]) * .6 + (rnd() - .5));
-  const n = 6 + diff * 2, out = [];
+  const n = OBST_COUNT, out = [];
   for (const [c, r] of cells) {
     if (out.length >= n) break;
     if (out.some(o => Math.abs(o.c - c) + Math.abs(o.r - r) < 2)) continue;
