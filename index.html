@@ -674,14 +674,19 @@ function drawWeapon(g, type, ang, t) {
     g.beginPath(); g.moveTo(9, -9); g.lineTo(-6, 0); g.lineTo(9, 9); g.stroke();
     g.fillStyle = '#5a3a1e'; rr(g, -9, -3, 5, 6, 1.5); g.fill();
     g.fillStyle = '#bdb6a8'; circle(g, -6, 0, big ? 3.2 : 2.6); g.fill();
-  } else if (type === 'fire') { // 느림보 총: 끈적이 젤리를 쏘는 통 달린 총
-    g.fillStyle = '#3d4a3a'; g.strokeStyle = '#141814'; g.lineWidth = 1.5;
-    rr(g, 8, -5, 11, 10, 3); g.fill(); g.stroke();
-    g.fillStyle = '#c8f59a'; circle(g, 19, 0, 3.4); g.fill();
-    g.fillStyle = d.color; rr(g, -15, -8, 25, 16, 6); g.fill(); g.stroke();
-    g.fillStyle = '#4f8f33'; circle(g, -4, 0, 6.5); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.45)'; circle(g, -6, -2.5, 2); g.fill();
-    g.fillStyle = d.color; circle(g, 21, 4, 2); g.fill(); circle(g, -15, 6, 1.6); g.fill();
+  } else if (type === 'fire') { // 느림보 총: 달팽이 껍데기에 젤리를 채운 총. 더듬이 눈이 앞을 봅니다
+    g.fillStyle = 'rgba(155,214,90,.22)'; g.beginPath(); g.ellipse(-17, 0, 9, 4, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = d.color; g.strokeStyle = '#2f4a1f'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(-18, 0); g.quadraticCurveTo(-16, -7, 0, -7); g.lineTo(13, -6); g.quadraticCurveTo(20, -5, 20, 0); g.quadraticCurveTo(20, 5, 13, 6); g.lineTo(0, 7); g.quadraticCurveTo(-16, 7, -18, 0); g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = '#2f4a1f'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(15, -3); g.lineTo(23, -9); g.moveTo(15, 3); g.lineTo(23, 9); g.stroke();
+    g.fillStyle = '#f5f0e0'; circle(g, 23.5, -9.5, 2.6); g.fill(); circle(g, 23.5, 9.5, 2.6); g.fill();
+    g.fillStyle = '#141414'; circle(g, 24.3, -9.5, 1.2); g.fill(); circle(g, 24.3, 9.5, 1.2); g.fill();
+    g.fillStyle = '#c8f59a'; circle(g, 20, 0, 2.2); g.fill();
+    g.fillStyle = '#b5793a'; g.strokeStyle = '#5a3818'; g.lineWidth = 1.6; circle(g, -3, 0, 11.5); g.fill(); g.stroke();
+    g.strokeStyle = '#5a3818'; g.lineWidth = 1.8; g.beginPath();
+    for (let a = 0, r0 = 1.5; a < Math.PI * 5; a += .25) { const rr2 = r0 + a * .6; g.lineTo(-3 + Math.cos(a) * rr2, Math.sin(a) * rr2); }
+    g.stroke();
+    g.fillStyle = 'rgba(255,240,200,.35)'; g.beginPath(); g.ellipse(-7, -5, 4, 2.2, -.6, 0, Math.PI * 2); g.fill();
   } else if (type === 'dump' || type === 'crane') { // 소형 대포 · 대형 대포
     const big = type === 'crane';
     const L = big ? 36 : 26, Wd = big ? 18 : 12, wheelY = big ? 16 : 12;
