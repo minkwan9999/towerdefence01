@@ -251,6 +251,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .mcard canvas { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 4px; display: block; }
 .mname { font-weight: 700; }
 .mcard .kv { font-size: 12px; }
+.items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.icard { display: grid; justify-items: center; gap: 2px; text-align: center; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--ic); border-radius: 6px; padding: 6px 4px; cursor: pointer; }
+.icard:hover:not(:disabled) { background: var(--panel-2); }
+.icard:disabled { cursor: default; opacity: .55; }
+.icard.on { box-shadow: 0 0 0 2px var(--ic); }
+.icard canvas { width: 36px; height: 36px; }
+.icard.locked canvas { filter: grayscale(.8); opacity: .6; }
+.icard .nm { display: block; font-weight: 700; font-size: 13px; }
+.icard .st { display: block; font-size: 11px; color: var(--muted); line-height: 1.3; }
+.affshop { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px; }
+.acard { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--ic); border-radius: 6px; padding: 10px 12px; }
+.acard canvas { width: 44px; height: 44px; }
+.acard .nm { font-weight: 700; }
+.acard .ds { font-size: 12px; color: var(--muted); line-height: 1.4; margin: 2px 0 8px; }
+.fine b { color: var(--text); font-weight: 500; }
+.chat-aff { font-family: var(--f-mono); font-size: 12px; color: #ff8fb3; font-weight: 700; }
+.chat-aff[hidden] { display: none; }
 .garage { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px; }
 .gcard { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
 .gcard canvas { width: 44px; height: 44px; }
@@ -320,6 +337,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
     <div class="skills" id="skills"></div>
     <div class="section-label">맵 · 판마다 무작위로 나옵니다</div>
     <div class="maps" id="maps"></div>
+    <div class="section-label">호감도 상점 · 대화 상대의 호감도로 구매</div>
+    <p class="fine" id="affNote"></p>
+    <div class="affshop" id="affShop"></div>
     <div class="label-row"><div class="section-label">무기고 · 무기 해제</div><button class="btn sm" id="guideBtnLobby" type="button">📖 무기 특성 전체 보기</button></div>
     <div class="garage" id="garage"></div>
     <p class="fine">기록과 업적 포인트는 이 브라우저에 저장됩니다. 시간은 게임 속도와 상관없이 게임 안의 시간으로 잽니다.</p>
@@ -342,6 +362,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
     <aside>
       <div class="label-row"><div class="section-label">무기 배치</div><button class="btn sm" id="guideBtn" type="button">📖 무기 특성</button></div>
       <div class="shop" id="shop"></div>
+      <div class="section-label">호감도 아이템 · 한 판에 한 번</div>
+      <div class="items" id="itemsBar"></div>
       <div class="panel" id="panel"></div>
       <div class="controls">
         <button class="btn primary" id="startBtn" type="button">웨이브 1 시작</button>
@@ -351,7 +373,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
       <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
       <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
       <div class="keys">
-        <kbd>1</kbd>–<kbd>0</kbd> 무기 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>I</kbd> 무기 특성 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
+        <kbd>1</kbd>–<kbd>7</kbd> 무기 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>I</kbd> 무기 특성 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
       </div>
     </aside>
   </div>
@@ -370,7 +392,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 <div class="chat" id="chat" role="dialog" aria-label="대화" hidden>
   <div class="chat-head">
     <canvas id="chatAvatar" width="76" height="76" aria-hidden="true"></canvas>
-    <div><div class="chat-name" id="chatName">대화 상대 고르기</div><div class="chat-sub" id="chatSub">함께 수다 떨 사람을 골라 주세요</div></div>
+    <div><div class="chat-name"><span id="chatName">대화 상대 고르기</span> <span class="chat-aff" id="chatAff" hidden>💗 0</span></div><div class="chat-sub" id="chatSub">함께 수다 떨 사람을 골라 주세요</div></div>
     <button class="btn sm chat-swap" id="chatSwap" type="button" hidden>상대 바꾸기</button>
     <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">×</button>
   </div>
@@ -436,10 +458,6 @@ const TOWERS = {
   crane:  { name: '대형 대포',  ap: 30, cost: 120, range: 2.0, dmg: 90, rate: 2.4, splash: .6, color: '#c98a4a', desc: '무거운 포탄을 쏩니다. 느리지만 한 방이 아주 셉니다.' },
   flume:  { name: '빙결총',     ap: 40, cost: 130, range: 1.9, dmg: 18, rate: 1.3, pulse: true, freeze: .5, color: '#86d0ee', desc: '냉기를 뿜어 범위 안의 적 모두를 잠깐 얼려 멈춰 세웁니다.' },
   tank:   { name: '강력 새총',  ap: 60, cost: 160, range: 3.6, dmg: 70, rate: 1.6, color: '#e2b54a', desc: '사거리가 가장 깁니다. 멀리서 큰 돌을 세게 날립니다.' },
-  // 비밀 무기: 해금 전에는 그림이 물음표로 보입니다. 능력치 미정, 아래 수치는 임시 값입니다.
-  secret1: { name: '비행기', ap: 80,  cost: 140, range: 3.0, dmg: 45,  rate: 1.0, color: '#7fb2e5', secret: true, desc: '하늘에서 날아와 적 한 대를 정확히 쏩니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
-  secret2: { name: '불', ap: 120, cost: 180, range: 2.8, dmg: 40,  rate: 1.4, splash: .8, color: '#ff7a2f', secret: true, desc: '활활 타는 불덩이를 던져 떨어진 자리 주변을 태웁니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
-  secret3: { name: '웅덩이', ap: 160, cost: 240, range: 3.4, dmg: 150, rate: 2.0, splash: 1.0, color: '#3f8fd0', secret: true, desc: '물웅덩이에서 커다란 물폭탄을 쏘아 올려 넓게 덮칩니다. 능력치는 아직 정해지지 않았습니다(임시 값).' },
 };
 const DIFF_STEP = 1.2;
 const DIFFS = [
@@ -458,9 +476,15 @@ function loadProg() {
   let p = null;
   try { p = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
   p = p && typeof p === 'object' ? p : {};
-  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, cleared: p.cleared && typeof p.cleared === 'object' ? p.cleared : {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {}, paint: p.paint && typeof p.paint === 'object' ? p.paint : {}, paintTokens: p.paintTokens | 0, persona: typeof p.persona === 'string' ? p.persona : null };
+  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, cleared: p.cleared && typeof p.cleared === 'object' ? p.cleared : {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {}, paint: p.paint && typeof p.paint === 'object' ? p.paint : {}, paintTokens: p.paintTokens | 0, persona: typeof p.persona === 'string' ? p.persona : null, aff: p.aff && typeof p.aff === 'object' ? p.aff : {}, items: p.items && typeof p.items === 'object' ? p.items : {} };
 }
 const prog = loadProg();
+// 비밀 무기(비행기·불·웅덩이)가 호감도 아이템으로 바뀌었으므로, 업적 포인트로 해제했던 사람에게는 그 포인트를 돌려줍니다.
+for (const [k, ap] of [['secret1', 80], ['secret2', 120], ['secret3', 160]]) {
+  if (prog.unlocked.includes(k)) { prog.unlocked = prog.unlocked.filter(x => x !== k); prog.ap += ap; }
+  if (prog.paint && k in prog.paint) { delete prog.paint[k]; prog.paintTokens = (prog.paintTokens | 0) + 1; }
+}
+try { localStorage.setItem(SAVE_KEY, JSON.stringify(prog)); } catch (e) { /* ignore */ }
 // 금광이 삭제되었으므로, 이미 해제한 사람에게는 해제 비용 20 AP를 돌려줍니다.
 if (prog.unlocked.includes('taxi')) { prog.unlocked = prog.unlocked.filter(x => x !== 'taxi'); prog.ap += 20; try { localStorage.setItem(SAVE_KEY, JSON.stringify(prog)); } catch (e) { /* ignore */ } }
 function saveProg() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(prog)); } catch (e) { /* progress stays for this visit only */ } }
@@ -477,7 +501,13 @@ const SKILLS = [
 const skillLv = id => Math.min(SKILLS.find(k => k.id === id).max, prog.skills[id] | 0);
 const skillVal = id => skillLv(id) * SKILLS.find(k => k.id === id).per;
 const sellRate = () => .5 + skillVal('sell') / 100;
-const ORDER = ['police', 'fire', 'dump', 'bumper', 'crane', 'flume', 'tank', 'secret1', 'secret2', 'secret3'];
+const ORDER = ['police', 'fire', 'dump', 'bumper', 'crane', 'flume', 'tank'];
+const ITEMS = {
+  secret1: { name: '비행기', color: '#7fb2e5', desc: '길의 시작부터 끝까지 날아가며, 아래에 적이 있으면 폭탄을 떨어뜨립니다. 적을 만나도 멈추지 않습니다.' },
+  secret2: { name: '불', color: '#ff7a2f', place: true, desc: '길 한 칸에 불을 놓습니다. 지나가는 적은 불이 붙어 4초 동안 체력이 계속 줄어듭니다.' },
+  secret3: { name: '웅덩이', color: '#3f8fd0', place: true, desc: '길 한 칸에 웅덩이를 만듭니다. 지나가는 적은 3초 동안 40% 느려집니다.' },
+};
+const ITEM_KEYS = Object.keys(ITEMS), ITEM_COST = 50;
 // 적군은 아군과 똑같은 차량을 검은색으로 칠한 것입니다.
 const ENEMIES = {
   grunt:  { name: '검은 택시',     car: 'taxi',   hp: 42,   speed: 1.15, reward: 6,   lives: 1,  scale: .9 },
@@ -685,7 +715,7 @@ function drawWeaponPainted(g, type, ang, t, hex) {
   g.drawImage(paintCv, -32, -32, 64, 64);
 }
 function drawWeapon(g, type, ang, t, noShadow) {
-  const d = TOWERS[type];
+  const d = TOWERS[type] || ITEMS[type];
   if (type === 'secret2') { // 불: 돌로 두른 모닥불, 혀처럼 일렁이는 불꽃
     g.fillStyle = '#4a4540'; g.strokeStyle = '#211d1a'; g.lineWidth = 1.5; circle(g, 0, 0, 18); g.fill(); g.stroke();
     g.fillStyle = '#5f5852'; for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; circle(g, Math.cos(a) * 15, Math.sin(a) * 15, 3.4); g.fill(); }
@@ -808,10 +838,7 @@ function drawTower(g, type, x, y, lv, ang, t) {
 
   g.save();
   const pc = paintOf(type);
-  if (d.secret && !isUnlocked(type)) {
-    g.fillStyle = '#1f2a25'; circle(g, 0, 0, 17); g.fill(); g.strokeStyle = '#4a5a52'; g.lineWidth = 1.5; g.setLineDash([3, 3]); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#c2a6ff'; g.font = '700 26px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 0, 1); g.textBaseline = 'alphabetic';
-  } else if (pc) drawWeaponPainted(g, type, ang, t, pc.hex); else drawWeapon(g, type, ang, t);
+  if (pc) drawWeaponPainted(g, type, ang, t, pc.hex); else drawWeapon(g, type, ang, t);
   g.restore();
   g.fillStyle = '#e2b54a';
   for (let i = 0; i < lv; i++) { circle(g, -(lv - 1) * 4 + i * 8, 22, 2.4); g.fill(); }
@@ -928,12 +955,12 @@ function drawObstacle(g, o) {
 // ---------- state ----------
 let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true, lockView = null, obsView = null;
 function reset(diff) {
-  S = { prevMap: S ? S.map : -1, diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
+  S = { prevMap: S ? S.map : -1, diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0, itemUsed: {}, hazards: [], planes: [] };
   let mi = Math.floor(Math.random() * MAPS.length);
   if (S.prevMap === mi) mi = (mi + 1 + Math.floor(Math.random() * (MAPS.length - 1))) % MAPS.length;
   S.map = mi; setMap(mi);
   S.obst = buildObstacles(mi);
-  occ = new Map(); build = null; sel = null; paused = false; obsView = null;
+  occ = new Map(); build = null; sel = null; paused = false; obsView = null; if (typeof itemPlace !== 'undefined') itemPlace = null;
   document.getElementById('overlay').hidden = true;
   if (typeof onNewGame === 'function') onNewGame();
 }
@@ -1031,7 +1058,7 @@ function fire(t, e, st) {
 const KNOCK_REF_HP = 42;
 const knockFactorOf = baseHp => Math.max(.15, Math.min(1.5, Math.sqrt(KNOCK_REF_HP / baseHp)));
 const knockFactor = e => knockFactorOf(e.maxHp / (e.hpScale || 1));
-const ARC_KINDS = new Set(['rock', 'wreck', 'fireball', 'blob']);
+const ARC_KINDS = new Set(['rock', 'wreck', 'fireball', 'blob', 'bomb']);
 const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1) * dmult(S.diff) * (1 - skillVal('slow') / 100);
 function update(dt) {
   for (const f of S.fx) { f.life -= dt; if (f.k === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } if (f.k === 'text') f.y -= 26 * dt; }
@@ -1052,6 +1079,7 @@ function update(dt) {
     if (e.d >= PATH_LEN) { e.alive = false; S.lives -= ENEMIES[e.type].lives; ring(W - 14, PTS[PTS.length - 1].y, 6, 50, '#e65a4f', .5); continue; }
     const p = posAt(e.d); e.x = p.x; e.y = p.y;
   }
+  updateHazards(dt);
   for (const t of S.towers) {
     if (t.bump > 0) t.bump -= dt;
     if (TOWERS[t.type].income) continue;
@@ -1070,7 +1098,7 @@ function update(dt) {
       if (k >= 1) {
         p.dead = true;
         for (const e of S.enemies) { if (!e.alive) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d <= p.splash) hurt(e, p.dmg * (1 - .4 * d / p.splash), p.src); }
-        const ic = { rock: ['#c9a46b', '#b08a5a'], wreck: ['#d7dde0', '#b08a5a'], fireball: ['#ff7a2f', '#ffc04a'], blob: ['#8fd0f5', '#cfeeff'] }[p.k];
+        const ic = { rock: ['#c9a46b', '#b08a5a'], wreck: ['#d7dde0', '#b08a5a'], fireball: ['#ff7a2f', '#ffc04a'], blob: ['#8fd0f5', '#cfeeff'], bomb: ['#ffcf6b', '#ff9a3c'] }[p.k];
         ring(p.x, p.y, 6, p.splash, ic[0], .35); sparks(p.x, p.y, ic[1], 8);
       }
     } else {
@@ -1138,12 +1166,17 @@ function render() {
     if (!t && canPlace(hover.c, hover.r)) { ctx.fillStyle = 'rgba(235,230,211,.06)'; ctx.fillRect(hover.c * T, hover.r * T, T, T); }
   }
   for (const o of S.obst.values()) drawObstacle(ctx, o);
+  for (const h of S.hazards) { ctx.save(); ctx.translate(h.x, h.y); ctx.scale(.85, .85); drawWeapon(ctx, h.type, 0, null, true); ctx.restore(); }
   if (obsView && S.obst.has(obsView)) { const o = S.obst.get(obsView); ctx.strokeStyle = '#c2a6ff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); rr(ctx, o.c * T + 3, o.r * T + 3, T - 6, T - 6, 8); ctx.stroke(); ctx.setLineDash([]); }
   for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
 
   if (sel) { ctx.strokeStyle = '#e2b54a'; ctx.lineWidth = 2; rr(ctx, sel.x - 27, sel.y - 27, 54, 54, 10); ctx.stroke(); }
   const sorted = S.enemies.slice().sort((a, b) => a.y - b.y);
   for (const e of sorted) drawEnemy(ctx, e);
+  for (const pl of S.planes) {
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(pl.x + 12, pl.y + 16, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(pl.x, pl.y - 8); ctx.scale(1.15, 1.15); drawWeapon(ctx, 'secret1', pl.ang, null, true); ctx.restore();
+  }
   for (const p of S.proj) {
     if (p.k === 'bullet' || p.k === 'drop' || p.k === 'shell') {
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
@@ -1154,7 +1187,11 @@ function render() {
     } else if (ARC_KINDS.has(p.k)) {
       const hy = p.y - (p.h || 0);
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
-      if (p.k === 'fireball') {
+      if (p.k === 'bomb') {
+        const by = p.y - (1 - Math.min(1, p.t / p.dur)) * 22;
+        ctx.fillStyle = '#26262b'; ctx.beginPath(); ctx.ellipse(p.x, by, 3.5, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e65a4f'; ctx.fillRect(p.x - 2.5, by - 6, 5, 2);
+      } else if (p.k === 'fireball') {
         ctx.save(); ctx.shadowColor = '#ff7a2f'; ctx.shadowBlur = 12; ctx.fillStyle = '#ff7a2f'; circle(ctx, p.x, hy, 6); ctx.fill();
         ctx.fillStyle = '#ffd24a'; circle(ctx, p.x, hy, 3.5); ctx.fill(); ctx.restore();
       } else if (p.k === 'blob') {
@@ -1181,6 +1218,11 @@ function render() {
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctx.strokeText(f.txt, f.x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x, f.y);
     }
     ctx.globalAlpha = 1;
+  }
+  if (itemPlace && hover && !S.over) {
+    const ok = PATH.has(hover.c + ',' + hover.r) && !hazardAt(hover.c, hover.r);
+    ctx.fillStyle = ok ? 'rgba(165,212,106,.3)' : 'rgba(230,90,79,.28)'; ctx.fillRect(hover.c * T, hover.r * T, T, T);
+    if (ok) { ctx.save(); ctx.globalAlpha = .6; ctx.translate((hover.c + .5) * T, (hover.r + .5) * T); ctx.scale(.85, .85); drawWeapon(ctx, itemPlace, 0, null, true); ctx.restore(); }
   }
   if (build && hover && !S.over) {
     const ok = canPlace(hover.c, hover.r), x = (hover.c + .5) * T, y = (hover.r + .5) * T, d = TOWERS[build];
@@ -1242,6 +1284,7 @@ function refreshUI() {
   $('sTime').textContent = mmss(S.time);
   $('sTimeBox').classList.toggle('late', S.time > limitOf(D, MAP));
   $('sWave').textContent = S.wave + ' / ' + MAX_WAVE;
+  renderItemsBar();
   $('sGold').textContent = S.gold;
   $('sLives').textContent = S.lives;
   $('sLivesBox').classList.toggle('low', S.lives <= 5);
@@ -1266,7 +1309,12 @@ function refreshUI() {
   $('pauseBtn').setAttribute('aria-label', paused ? '계속하기' : '일시정지');
 
   let key, html;
-  if (obsView && S.obst.has(obsView)) {
+  if (itemPlace) {
+    const it = ITEMS[itemPlace];
+    key = 'p' + itemPlace;
+    html = `<h3>${it.name} <span class="lv">아이템</span></h3><p>${it.desc}</p><p>적이 지나가는 <b>길 칸</b>을 눌러 놓으세요. 한 판에 한 번만 쓸 수 있습니다.</p>
+      <div class="row"><button class="btn grow" type="button" data-act="cancel">취소</button></div>`;
+  } else if (obsView && S.obst.has(obsView)) {
     const o = S.obst.get(obsView), od = OBST_TYPES[o.type], can = prog.ap >= CLEAR_COST;
     key = 'o' + obsView + prog.ap;
     html = `<h3>${od.name} <span class="lv">장애물</span></h3><p>${od.desc} 이 칸에는 무기를 세울 수 없습니다.</p>
@@ -1312,7 +1360,7 @@ $('panel').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act;
   if (a === 'guide') openGuide(build || (sel && sel.type) || lockView);
-  if (a === 'cancel') { build = null; lockView = null; obsView = null; }
+  if (a === 'cancel') { build = null; lockView = null; obsView = null; itemPlace = null; }
   if (a === 'clear' && obsView && clearObstacle(obsView)) obsView = null;
   if (a === 'unlock' && lockView && unlockVehicle(lockView)) { const t = lockView; lockView = null; build = t; }
   if (a === 'up') upgrade(sel);
@@ -1389,7 +1437,7 @@ function renderMaps() {
   });
 }
 function renderLobby() {
-  renderSkills(); renderMaps();
+  renderSkills(); renderMaps(); renderAffShop();
   $('diffs').innerHTML = DIFFS.map((D, i) => {
     const r = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
     return `<div class="dcard" style="--dc:${D.color}">
@@ -1440,6 +1488,7 @@ cv.addEventListener('click', e => {
   lockView = null;
   if (S.over) return;
   const h = tileAt(e); if (!h) return;
+  if (itemPlace) { placeHazard(h.c, h.r); return; }
   const t = occ.get(h.c + ',' + h.r);
   obsView = null;
   if (S.obst.has(h.c + ',' + h.r)) { obsView = h.c + ',' + h.r; build = null; sel = null; return; }
@@ -1463,7 +1512,7 @@ window.addEventListener('keydown', e => {
   }
   const slot = n === 0 ? 10 : n;
   if (n >= 0 && slot <= ORDER.length) toggleBuild(ORDER[slot - 1]);
-  else if (e.key === 'Escape') { build = null; sel = null; lockView = null; obsView = null; }
+  else if (e.key === 'Escape') { build = null; sel = null; lockView = null; obsView = null; itemPlace = null; }
   else if (e.code === 'Space') { e.preventDefault(); startWave(); }
   else if (e.key === 'u' || e.key === 'U') upgrade(sel);
   else if (e.key === 'i' || e.key === 'I') openGuide(build || (sel && sel.type) || lockView);
@@ -1599,6 +1648,36 @@ const TRIGGERS = [
 ];
 const SUGGEST = ['안녕?', '넌 누구야?', '뭐 해?', '배고파', '심심해', '몇 살이야?', '꿈이 뭐야?', '지금 상황 어때?', '팁 좀 줘', '다음 웨이브는?', '좋아하는 색깔은?', '피자 좋아해?', '커피 마실래?', '여행 가고 싶다', '강아지 좋아해?', '노래 추천해 줘', '바다 보고 싶다', '친구 있어?', '무섭지 않아?', '언제 퇴근해?', '오늘 내 생일이야', '우산 챙겼어?', '힘 세?', '고마워', '최고야!', '피곤하다'];
 const rollTrigger = () => pick(TRIGGERS);
+// ---------- affection ----------
+// 호감도는 대화 상대마다 따로 쌓입니다. 메시지 하나에 대략 0.4~2점이 오르도록 설계했습니다.
+//  기본 0.4 + 글자 수 보너스(최대 0.6) + 알아듣는 주제 0.5 + 상대에게 관심 보이기(이름·음식·취미·꿈·나이) 0.3
+//  + 칭찬·고마움 표현 0.8. 최근 5개와 같은 말은 0점, 4초 안에 연달아 보내면 30%만 오릅니다.
+//  퀴즈를 맞히면 +3, 틀려도 +0.5. 그래서 아이템 하나(50)를 사려면 대략 40~60번 대화가 필요합니다.
+const AFF_MILESTONES = [10, 25, 50, 100, 200];
+const affOf = P => prog.aff[P.id] || 0;
+function gainAff(c, amt) {
+  const before = affOf(c.P), after = Math.round((before + amt) * 10) / 10;
+  prog.aff[c.P.id] = after; saveProg(); updateAffUI();
+  return AFF_MILESTONES.find(x => before < x && after >= x);
+}
+function msgAff(c, text, norm, hit) {
+  const now = Date.now();
+  let g = .4 + Math.min(.6, text.length / 50);
+  if (hit) g += .5;
+  if (hit && ['누구', '배고', '취미', '꿈', '몇살'].some(k => hit.k.includes(k))) g += .3;
+  if (/고마|감사|최고|멋져|짱|좋아해|사랑|귀여|예쁘|잘했|잘한다|대단/.test(norm)) g += .8;
+  c.recent = c.recent || [];
+  if (c.recent.includes(norm)) g = 0;
+  if (now - (c.lastAt || 0) < 4000) g *= .3;
+  c.recent = [norm, ...c.recent].slice(0, 5); c.lastAt = now;
+  return g;
+}
+function updateAffUI() {
+  const P = curP(), el = $('chatAff');
+  if (el) { el.hidden = !P || picking; if (P) el.textContent = '💗 ' + Math.floor(affOf(P)); }
+  itemsKey = '';
+}
+
 let quizDeck = [];
 function drawQuiz() {
   if (!quizDeck.length) quizDeck = QUIZ.map((_, i) => i).sort(() => Math.random() - .5);
@@ -1718,12 +1797,14 @@ async function say(c, html, cls) {
 }
 
 function setHeader() {
+  updateAffUI();
   const P = curP(), head = $('chatAvatar').getContext('2d');
   head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76);
   if (P && !picking) { head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawPersona(head, P.id); }
   $('chatName').textContent = picking || !P ? '대화 상대 고르기' : P.name;
   $('chatSub').textContent = picking || !P ? '함께 수다 떨 사람을 골라 주세요' : P.tag;
   $('chatSwap').hidden = picking || !P;
+  updateAffUI();
   chatEl.style.setProperty('--tc', P && !picking ? P.color : '#e2b54a');
 }
 function renderPicker() {
@@ -1740,7 +1821,8 @@ function renderPicker() {
   chatReplies.innerHTML = ''; chatSuggest.innerHTML = ''; chatInput.disabled = true; $('chatSend').disabled = true; chatInput.placeholder = '먼저 대화 상대를 골라 주세요';
 }
 function choosePersona(id) {
-  prog.persona = id; saveProg(); picking = false;
+  prog.persona = id; saveProg(); picking = false; itemsKey = '';
+  if (inLobby) renderLobby();
   const c = convo(curP());
   if (!c.greeted) { c.greeted = true; for (const line of c.P.hi) c.log.push({ who: 'them', html: line, time: clock() }); }
   renderChat();
@@ -1764,7 +1846,8 @@ function closeChat() { chatOpen = false; picking = false; chatEl.hidden = true; 
 function updateFab() {
   const P = curP(), c = P && chats[P.id], n = c ? c.unread : 0;
   const label = P ? P.name : '대화 상대';
-  if ($('fabName').textContent !== label) $('fabName').textContent = label;
+  const lab2 = P ? `${label} 💗${Math.floor(affOf(P))}` : label;
+  if ($('fabName').textContent !== lab2) $('fabName').textContent = lab2;
   $('fabBadge').hidden = !n; if (n) $('fabBadge').textContent = Math.min(9, n);
 }
 
@@ -1826,7 +1909,9 @@ async function send(text) {
     await say(c, voice(P, c.cool ? '퀴즈는 다음 웨이브 막고 나서 또 낼게요!' : '퀴즈요? 그냥은 안 내요 😏 수다 떨다 보면 갑자기 생각날지도?'));
   } else {
     const hit = TALK.find(x => x.k.some(k => norm.includes(k.replace(/\s+/g, ''))));
+    const ms = gainAff(c, msgAff(c, text, norm, hit));
     await say(c, voice(P, hit ? hit.r(P) : pick(FALLBACK)));
+    if (ms) await say(c, voice(P, `우리 호감도가 ${ms}이 됐어요! 💗 ${ms >= ITEM_COST ? '호감도 상점에서 선물을 고를 수 있어요.' : '더 친해지면 선물을 줄게요.'}`), 'gift');
     if (!hit && Math.random() < .4) await say(c, voice(P, pick(FOLLOW)));
     if (c.trigger && ++c.misses >= 3) { c.misses = 0; await say(c, voice(P, c.trigger.hint)); }
   }
@@ -1840,6 +1925,7 @@ async function onChip(c, it) {
   const live = p.game === S && !S.over && !inLobby;
   if (p.kind === 'quiz') {
     logMe(c, esc(it.label)); refreshComposer();
+    gainAff(c, it.label === p.q.a ? 3 : .5);
     if (it.label === p.q.a && live) {
       await say(c, voice(c.P, '정답! 👏 선물 하나 골라 보세요.'), 'gift');
       c.pending = { kind: 'reward', gold: 40 + S.wave * 5, game: S };
@@ -1884,6 +1970,110 @@ $('chatFab').addEventListener('click', openChat);
 $('chatSwap').addEventListener('click', () => { picking = true; renderChat(); });
 $('chatForm').addEventListener('submit', e => { e.preventDefault(); send(chatInput.value); });
 chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
+
+// ---------- affection items ----------
+// 비행기·불·웅덩이: 대화 상대의 호감도 50으로 사는 아이템. 한 번 사면 계속 보유하고, 한 판에 한 번씩 쓸 수 있습니다.
+let itemPlace = null;
+const hazardAt = (c, r) => S.hazards.some(h => h.c === c && h.r === r);
+function useItem(k) {
+  if (inLobby || S.over || !prog.items[k] || S.itemUsed[k]) return;
+  if (k === 'secret1') {
+    S.itemUsed[k] = true;
+    S.planes.push({ d: 0, cd: 0, x: PTS[0].x, y: PTS[0].y, ang: 0 });
+    floatText(60, PTS[0].y - 24, '✈️ 비행기 출격!', '#7fb2e5');
+  } else { itemPlace = itemPlace === k ? null : k; build = null; sel = null; lockView = null; obsView = null; }
+  panelKey = '';
+}
+function placeHazard(c, r) {
+  if (!itemPlace || !PATH.has(c + ',' + r) || hazardAt(c, r)) return false;
+  const x = (c + .5) * T, y = (r + .5) * T;
+  S.hazards.push({ type: itemPlace, c, r, x, y });
+  S.itemUsed[itemPlace] = true;
+  ring(x, y, 6, 36, ITEMS[itemPlace].color, .5);
+  itemPlace = null; panelKey = '';
+  return true;
+}
+function buyItem(k) {
+  const P = curP();
+  if (!P) { openChat(); return; }
+  if (prog.items[k] || affOf(P) < ITEM_COST) return;
+  prog.aff[P.id] = Math.round((affOf(P) - ITEM_COST) * 10) / 10; prog.items[k] = true; saveProg();
+  logThem(convo(P), voice(P, `${ITEMS[k].name} 선물이에요! 💝 한 판에 한 번씩 꼭 필요할 때 써요.`));
+  updateAffUI(); panelKey = ''; itemsKey = '';
+  if (inLobby) renderLobby();
+}
+function updateHazards(dt) {
+  for (const e of S.enemies) {
+    if (!e.alive) continue;
+    const ec = Math.floor(e.x / T), er = Math.floor(e.y / T);
+    for (const h of S.hazards) {
+      if (h.c !== ec || h.r !== er) continue;
+      if (h.type === 'secret2') { e.burnT = 4; e.burnDps = 5 * (e.hpScale || 1); }
+      else slowDown(e, .4, 3);
+    }
+    if (e.burnT > 0) {
+      e.burnT -= dt; hurt(e, e.burnDps * dt, null);
+      if (!reduceMotion && Math.random() < dt * 8) S.fx.push({ k: 'spark', x: e.x + (Math.random() - .5) * 16, y: e.y - 4, vx: 0, vy: -36, color: '#ff9a3c', life: .4, max: .4 });
+    }
+  }
+  const sc = Math.pow(1.145, Math.max(0, S.wave - 1)) * dmult(S.diff);
+  for (const pl of S.planes) {
+    pl.d += 4.5 * T * dt;
+    const p = posAt(pl.d), q = posAt(pl.d + 4);
+    pl.x = p.x; pl.y = p.y; if (q.x !== p.x || q.y !== p.y) pl.ang = Math.atan2(q.y - p.y, q.x - p.x);
+    pl.cd -= dt;
+    if (pl.cd <= 0) {
+      const tgt = S.enemies.find(e => e.alive && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (.9 * T) ** 2);
+      if (tgt) { pl.cd = .3; S.proj.push({ k: 'bomb', sx: p.x, sy: p.y, tx: tgt.x, ty: tgt.y, x: p.x, y: p.y, t: 0, dur: .3, arc: 0, dmg: 55 * sc, splash: .8 * T, src: null }); }
+    }
+    if (pl.d > PATH_LEN + T) pl.done = true;
+  }
+  S.planes = S.planes.filter(pl => !pl.done);
+}
+function drawItemIcon(cvs, k) {
+  const g = cvs.getContext('2d'), s = cvs.width / 60;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvs.width, cvs.height);
+  g.setTransform(s, 0, 0, s, 30 * s, 30 * s); drawWeapon(g, k, -.7, null, true);
+}
+let itemsKey = '';
+function renderItemsBar() {
+  const P = curP(), aff = P ? Math.floor(affOf(P)) : 0;
+  const key = ITEM_KEYS.map(k => [!!prog.items[k], !!S.itemUsed[k], itemPlace === k]).join() + '|' + aff + (P ? P.id : '') + S.over;
+  if (key === itemsKey) return; itemsKey = key;
+  const bar = $('itemsBar'); bar.innerHTML = '';
+  for (const k of ITEM_KEYS) {
+    const it = ITEMS[k], own = !!prog.items[k], used = !!S.itemUsed[k], placing = itemPlace === k;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'icard' + (placing ? ' on' : '') + (own ? '' : ' locked'); b.style.setProperty('--ic', it.color);
+    let st, act;
+    if (!own) { st = `💗 ${ITEM_COST}로 구매`; act = 'buy'; b.disabled = !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
+    else if (used) { st = '이번 판 사용함'; act = ''; b.disabled = true; }
+    else if (placing) { st = '길 칸을 고르세요 · 취소'; act = 'use'; }
+    else { st = it.place ? '눌러서 길에 놓기' : '눌러서 출격'; act = 'use'; b.disabled = S.over; }
+    b.dataset.item = k; b.dataset.act = act;
+    b.innerHTML = `<canvas width="72" height="72" aria-hidden="true"></canvas><span><span class="nm">${it.name}</span><span class="st">${st}</span></span>`;
+    drawItemIcon(b.querySelector('canvas'), k);
+    bar.appendChild(b);
+  }
+}
+$('itemsBar').addEventListener('click', e => {
+  const b = e.target.closest('[data-item]'); if (!b || b.disabled) return;
+  if (b.dataset.act === 'buy') buyItem(b.dataset.item);
+  else if (b.dataset.act === 'use') useItem(b.dataset.item);
+  itemsKey = '';
+});
+function renderAffShop() {
+  const P = curP(), aff = P ? Math.floor(affOf(P)) : 0;
+  $('affNote').innerHTML = P ? `지금 대화 상대 <b>${P.name}</b>의 호감도: <b>💗 ${aff}</b>. 대화할수록 천천히 오릅니다.` : '오른쪽 아래 💬 버튼에서 대화 상대를 먼저 고르세요. 대화할수록 호감도가 천천히 오릅니다.';
+  $('affShop').innerHTML = ITEM_KEYS.map(k => {
+    const it = ITEMS[k], own = !!prog.items[k], can = P && aff >= ITEM_COST;
+    return `<div class="acard" style="--ic:${it.color}"><canvas width="88" height="88" data-icon="${k}" aria-hidden="true"></canvas><div>
+      <div class="nm">${it.name}</div><div class="ds">${it.desc}</div>
+      ${own ? '<span class="owned">보유 · 한 판에 한 번</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-buyitem="${k}" ${can ? '' : 'disabled'}>💗 ${ITEM_COST}로 구매</button>`}
+    </div></div>`;
+  }).join('');
+  for (const c of $('affShop').querySelectorAll('[data-icon]')) drawItemIcon(c, c.dataset.icon);
+}
+$('affShop').addEventListener('click', e => { const b = e.target.closest('[data-buyitem]'); if (b) buyItem(b.dataset.buyitem); });
 
 // ---------- weapon guide ----------
 const ROLE = { police: '단일 · 빠른 연사', fire: '단일 · 둔화', dump: '범위 · 포물선 포탄', bumper: '단일 · 밀어내기', crane: '범위 · 강한 한 방', flume: '주변 전체 · 정지', tank: '단일 · 최장 사거리', secret1: '단일 · 공중 사격 (임시 능력치)', secret2: '범위 · 불덩이 (임시 능력치)', secret3: '범위 · 물폭탄 (임시 능력치)' };
