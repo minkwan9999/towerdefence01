@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>협곡 방어전</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a night-time field map as the board, with a quartermaster's ledger beside it (stacks under the board on phones). Single committed dark look. */
+:root {
+  --ink: #0e1714;
+  --panel: #15211c;
+  --panel-2: #1b2a24;
+  --line: #2a3b33;
+  --text: #ebe6d3;
+  --muted: #94a397;
+  --brass: #e2b54a;
+  --danger: #e65a4f;
+  --f-display: "Black Han Sans", "IBM Plex Sans KR", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--ink); color: var(--text); }
+body { font-family: var(--f-body); font-size: 14px; line-height: 1.5; }
+.app {
+  max-width: 1280px; margin: 0 auto;
+  padding-block: 20px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 16px;
+}
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .18em; color: var(--brass); text-transform: uppercase; }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(30px, 5vw, 44px); line-height: 1; margin: 4px 0 0; letter-spacing: .01em; text-wrap: balance; }
+.stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px 7px; min-width: 92px; }
+.stat .k { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.stat .v { font-family: var(--f-mono); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat.gold .v { color: var(--brass); }
+.stat.lives.low .v { color: var(--danger); }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+@media (max-width: 920px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+.board { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+canvas#game { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; max-width: 100%; touch-action: manipulation; cursor: crosshair; }
+.overlay {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: rgba(8, 14, 12, .72); backdrop-filter: blur(2px); padding: 16px;
+}
+.overlay[hidden] { display: none; }
+.overlay .card { text-align: center; display: grid; gap: 10px; justify-items: center; max-width: 360px; }
+.overlay h2 { font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 5vw, 40px); margin: 0; line-height: 1.1; }
+.overlay p { margin: 0; color: var(--muted); }
+
+aside { display: grid; gap: 12px; min-width: 0; }
+.section-label { font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+.shop { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 920px) and (min-width: 560px) { .shop { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tcard {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.tcard:hover { background: var(--panel-2); }
+.tcard:active { transform: translateY(1px); }
+.tcard[aria-pressed="true"] { border-color: var(--brass); background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--brass); }
+.tcard canvas { width: 44px; height: 44px; }
+.tcard .nm { font-weight: 700; font-size: 14px; line-height: 1.2; }
+.tcard .meta { display: flex; justify-content: space-between; gap: 4px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.tcard .cost { color: var(--brass); font-weight: 700; }
+.tcard.poor .cost { color: var(--danger); }
+.tcard.poor canvas { opacity: .5; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: grid; gap: 10px; min-height: 172px; align-content: start; }
+.panel h3 { margin: 0; font-size: 16px; display: flex; align-items: baseline; gap: 8px; }
+.panel h3 .lv { font-family: var(--f-mono); font-size: 12px; color: var(--brass); }
+.panel p { margin: 0; color: var(--muted); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.kv dd .up { color: #a5d46a; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.wave-list { display: grid; gap: 4px; font-size: 13px; }
+.wave-list div { display: flex; justify-content: space-between; }
+.wave-list span:last-child { font-family: var(--f-mono); color: var(--muted); }
+
+.btn {
+  font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+  border-radius: 6px; padding: 9px 14px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--text);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--brass); color: #1d1606; border-color: var(--brass); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); border-color: var(--brass); }
+.btn.danger { color: var(--danger); }
+.btn .mono { font-family: var(--f-mono); font-size: 13px; }
+.btn.grow { flex: 1 1 auto; }
+.controls { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; }
+.auto { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
+.auto input { accent-color: var(--brass); width: 16px; height: 16px; }
+.keys { color: var(--muted); font-size: 12px; line-height: 1.7; }
+kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); color: var(--text); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div>
+      <div class="eyebrow">Canyon Hold · 차량 부대 vs 젤리 군단</div>
+      <h1>협곡 방어전</h1>
+    </div>
+    <div class="stats" aria-live="polite">
+      <div class="stat"><div class="k">웨이브</div><div class="v" id="sWave">0 / 20</div></div>
+      <div class="stat gold"><div class="k">금화</div><div class="v" id="sGold">180</div></div>
+      <div class="stat lives" id="sLivesBox"><div class="k">성문 내구도</div><div class="v" id="sLives">20</div></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="board">
+      <canvas id="game" aria-label="타워 디펜스 게임판"></canvas>
+      <div class="overlay" id="overlay" hidden>
+        <div class="card">
+          <div class="eyebrow" id="ovEyebrow">전투 종료</div>
+          <h2 id="ovTitle">성문이 무너졌습니다</h2>
+          <p id="ovText">웨이브 7까지 버텼습니다.</p>
+          <button class="btn primary" id="restartBtn" type="button">다시 하기</button>
+        </div>
+      </div>
+    </div>
+
+    <aside>
+      <div class="section-label">차량 배치</div>
+      <div class="shop" id="shop"></div>
+      <div class="panel" id="panel"></div>
+      <div class="controls">
+        <button class="btn primary" id="startBtn" type="button">웨이브 1 시작</button>
+        <button class="btn" id="speedBtn" type="button" aria-label="게임 속도"><span class="mono">1×</span></button>
+        <button class="btn" id="pauseBtn" type="button" aria-label="일시정지">❚❚</button>
+      </div>
+      <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
+      <div class="keys">
+        <kbd>1</kbd>–<kbd>8</kbd> 차량 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+const COLS = 16, ROWS = 10, T = 60, W = COLS * T, H = ROWS * T, MAX_WAVE = 20;
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- path ----------
+const WAYPOINTS = [[-1,1],[4,1],[4,7],[8,7],[8,3],[12,3],[12,8],[16,8]];
+const PTS = WAYPOINTS.map(([c, r]) => ({ x: (c + .5) * T, y: (r + .5) * T }));
+const SEGS = []; let PATH_LEN = 0;
+for (let i = 0; i < PTS.length - 1; i++) {
+  const a = PTS[i], b = PTS[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y);
+  SEGS.push({ a, b, len, start: PATH_LEN }); PATH_LEN += len;
+}
+function posAt(d) {
+  for (const s of SEGS) {
+    if (d <= s.start + s.len) { const t = (d - s.start) / s.len; return { x: s.a.x + (s.b.x - s.a.x) * t, y: s.a.y + (s.b.y - s.a.y) * t }; }
+  }
+  const e = PTS[PTS.length - 1]; return { x: e.x, y: e.y };
+}
+const PATH = new Set();
+for (let i = 0; i < WAYPOINTS.length - 1; i++) {
+  let [c, r] = WAYPOINTS[i]; const [c2, r2] = WAYPOINTS[i + 1];
+  const dc = Math.sign(c2 - c), dr = Math.sign(r2 - r);
+  while (true) {
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) PATH.add(c + ',' + r);
+    if (c === c2 && r === r2) break;
+    c += dc; r += dr;
+  }
+}
+
+// ---------- definitions ----------
+const TOWERS = {
+  police: { name: '경찰차',     cost: 50,  range: 2.6, dmg: 11, rate: .45, color: '#5b8def', desc: '사이렌을 울리며 빠르게 연사합니다. 어디에 두어도 제 몫을 합니다.' },
+  fire:   { name: '소방차',     cost: 70,  range: 2.3, dmg: 6,  rate: .7, slow: .45, slowDur: 1.6, color: '#e2453a', desc: '물대포를 맞은 적은 느려집니다. 화력 좋은 차 앞에 두세요.' },
+  dump:   { name: '덤프트럭',   cost: 90,  range: 2.4, dmg: 30, rate: 1.5, splash: .95, color: '#f0b429', desc: '돌무더기를 쏟아부어 떨어진 자리 주변을 모두 때립니다.' },
+  bumper: { name: '범퍼카',     cost: 60,  range: 1.4, dmg: 14, rate: .9, knock: .6, color: '#ff5fa2', desc: '가까이 온 적을 들이받아 뒤로 밀어냅니다. 길 모퉁이에 좋습니다.' },
+  taxi:   { name: '택시',       cost: 80,  range: 0,   dmg: 0,  rate: 0, income: 15, color: '#f7c600', desc: '싸우지 않습니다. 웨이브를 막을 때마다 요금을 벌어 옵니다.' },
+  crane:  { name: '크레인',     cost: 120, range: 2.0, dmg: 90, rate: 2.4, splash: .6, color: '#e8a317', desc: '철거용 쇠공을 떨어뜨립니다. 느리지만 한 방이 아주 셉니다.' },
+  flume:  { name: '후룸라이드', cost: 130, range: 1.9, dmg: 18, rate: 1.3, pulse: true, slow: .25, slowDur: .8, color: '#4fb3e8', desc: '물보라를 일으켜 범위 안의 적 모두를 적시고 조금 늦춥니다.' },
+  tank:   { name: '탱크',       cost: 160, range: 3.6, dmg: 70, rate: 1.6, color: '#7c8b45', desc: '사거리가 가장 깁니다. 멀리서 강한 포탄을 쏩니다.' },
+};
+const ORDER = ['police', 'fire', 'dump', 'bumper', 'taxi', 'crane', 'flume', 'tank'];
+// 적은 모두 같은 젤리 모양이고 색으로만 구분합니다.
+const ENEMIES = {
+  grunt:  { name: '초록 젤리', hp: 42,   speed: 1.15, reward: 6,   lives: 1,  color: '#7ed35f' },
+  runner: { name: '노랑 젤리', hp: 26,   speed: 2.1,  reward: 5,   lives: 1,  color: '#f4dd4c' },
+  brute:  { name: '보라 젤리', hp: 150,  speed: .7,   reward: 14,  lives: 2,  color: '#a07ae6' },
+  boss:   { name: '빨강 젤리', hp: 1600, speed: .5,   reward: 150, lives: 10, color: '#ef4f45' },
+};
+const ER = 12;
+
+function stats(t) {
+  const d = TOWERS[t.type], k = t.lv - 1;
+  return {
+    dmg: d.dmg * Math.pow(1.6, k),
+    range: d.range ? (d.range + .35 * k) * T : 0,
+    rate: d.rate * Math.pow(.88, k),
+    slow: d.slow ? Math.min(.7, d.slow + .08 * k) : 0,
+    slowDur: d.slowDur || 0,
+    splash: d.splash ? (d.splash + .15 * k) * T : 0,
+    knock: d.knock ? (d.knock + .15 * k) * T : 0,
+    income: d.income ? Math.round(d.income * [1, 1.8, 2.8][k]) : 0,
+  };
+}
+const upCost = t => Math.round(TOWERS[t.type].cost * .75 * t.lv);
+const refund = t => Math.floor(t.invested * .7);
+
+function buildWave(w) {
+  const list = [], n = 6 + Math.floor(w * 1.8);
+  for (let i = 0; i < n; i++) {
+    let type = 'grunt';
+    if (w >= 3 && i % 3 === 1) type = 'runner';
+    if (w >= 5 && i % 5 === 4) type = 'brute';
+    if (w >= 12 && i % 4 === 2) type = 'brute';
+    list.push({ type, gap: type === 'runner' ? .45 : type === 'brute' ? 1.1 : .75 });
+  }
+  if (w % 10 === 0) list.push({ type: 'boss', gap: 2 });
+  return list;
+}
+
+// ---------- canvas ----------
+const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+const dpr = Math.min(2, window.devicePixelRatio || 1);
+cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function circle(g, x, y, r) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); }
+const onPath = (c, r) => PATH.has(c + ',' + r);
+
+const bg = document.createElement('canvas'); bg.width = W * dpr; bg.height = H * dpr;
+(function drawBackground() {
+  const g = bg.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const rnd = mulberry32(11);
+  g.fillStyle = '#22372a'; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 280; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 20 + rnd() * 70;
+    g.fillStyle = rnd() < .55 ? 'rgba(10,26,17,.12)' : 'rgba(140,170,100,.05)';
+    circle(g, x, y, r); g.fill();
+  }
+  // faint build grid
+  g.strokeStyle = 'rgba(235,230,211,.045)'; g.lineWidth = 1;
+  for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) if (!onPath(c, r)) g.strokeRect(c * T + .5, r * T + .5, T - 1, T - 1);
+  // grass tufts and pebbles
+  for (let i = 0; i < 420; i++) {
+    const x = rnd() * W, y = rnd() * H;
+    if (onPath(Math.floor(x / T), Math.floor(y / T))) continue;
+    if (rnd() < .75) {
+      g.strokeStyle = rnd() < .5 ? 'rgba(170,205,120,.28)' : 'rgba(20,40,26,.5)'; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x - 2, y - 5); g.moveTo(x, y); g.lineTo(x + 2, y - 6); g.moveTo(x, y); g.lineTo(x + 4, y - 3); g.stroke();
+    } else {
+      g.fillStyle = 'rgba(160,160,140,.25)'; circle(g, x, y, 1.5 + rnd() * 2); g.fill();
+    }
+  }
+  // trees, kept to the map edges so building spots stay clean
+  for (let i = 0; i < 60; i++) {
+    const c = Math.floor(rnd() * COLS), r = rnd() < .5 ? (rnd() < .5 ? 0 : ROWS - 1) : Math.floor(rnd() * ROWS);
+    if (onPath(c, r)) continue;
+    const x = c * T + 8 + rnd() * (T - 16), y = r * T + 8 + rnd() * (T - 16), s = 6 + rnd() * 6;
+    g.fillStyle = 'rgba(0,0,0,.25)'; circle(g, x + 3, y + 4, s); g.fill();
+    g.fillStyle = '#17291e'; circle(g, x, y, s); g.fill();
+    g.fillStyle = 'rgba(120,160,90,.25)'; circle(g, x - s * .3, y - s * .3, s * .5); g.fill();
+  }
+  // road
+  const road = (w, col) => { g.strokeStyle = col; g.lineWidth = w; g.lineJoin = 'miter'; g.lineCap = 'butt'; g.beginPath(); PTS.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.stroke(); };
+  road(T * .92, '#5d4b31');
+  road(T * .8, '#a98b5a');
+  road(T * .46, 'rgba(205,178,124,.55)');
+  for (const k of PATH) {
+    const [c, r] = k.split(',').map(Number);
+    for (let i = 0; i < 6; i++) { g.fillStyle = rnd() < .5 ? 'rgba(80,60,35,.35)' : 'rgba(230,210,160,.25)'; circle(g, c * T + 10 + rnd() * (T - 20), r * T + 10 + rnd() * (T - 20), .8 + rnd() * 1.6); g.fill(); }
+  }
+  // gate (exit)
+  const gy = 8 * T;
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(W - 30, gy - 10, 30, T + 24);
+  g.fillStyle = '#5f6663'; g.fillRect(W - 26, gy - 14, 26, T + 24);
+  g.fillStyle = '#4a504d'; for (let i = 0; i < 4; i++) g.fillRect(W - 26, gy - 14 + i * 21, 26, 2);
+  g.fillStyle = '#5f6663'; for (let i = 0; i < 3; i++) g.fillRect(W - 26 + i * 10, gy - 22, 6, 8);
+  g.fillStyle = '#2a1d10'; rr(g, W - 20, gy + 14, 20, 32, 6); g.fill();
+  g.fillStyle = '#e2b54a'; g.fillRect(W - 14, gy - 40, 2, 26); g.beginPath(); g.moveTo(W - 12, gy - 40); g.lineTo(W - 2, gy - 35); g.lineTo(W - 12, gy - 30); g.fill();
+  // entry chevrons
+  g.strokeStyle = 'rgba(230,90,79,.65)'; g.lineWidth = 3;
+  for (let i = 0; i < 2; i++) { const x = 10 + i * 10, y = 1.5 * T; g.beginPath(); g.moveTo(x, y - 7); g.lineTo(x + 7, y); g.lineTo(x, y + 7); g.stroke(); }
+})();
+
+// ---------- drawing ----------
+// vehicles are drawn top-down, facing +x
+function wheels(g, len, wid, xs) {
+  g.fillStyle = '#121212';
+  for (const sx of xs) { g.fillRect(len * sx - 4, -wid / 2 - 2, 8, 3); g.fillRect(len * sx - 4, wid / 2 - 1, 8, 3); }
+}
+function carBody(g, len, wid, color, r = 6) {
+  g.fillStyle = color; g.strokeStyle = '#141414'; g.lineWidth = 1.5;
+  rr(g, -len / 2, -wid / 2, len, wid, r); g.fill(); g.stroke();
+}
+function glass(g, x, y, w, h) { g.fillStyle = '#26394a'; rr(g, x, y, w, h, 2); g.fill(); }
+
+function drawTower(g, type, x, y, lv, ang, t) {
+  const d = TOWERS[type];
+  g.save(); g.translate(x, y);
+  // parking pad
+  g.fillStyle = '#2b3230'; rr(g, -26, -26, 52, 52, 6); g.fill();
+  g.strokeStyle = '#3f4945'; g.lineWidth = 1.5; g.stroke();
+  g.strokeStyle = 'rgba(235,230,211,.55)'; g.lineWidth = 2;
+  g.beginPath(); for (const [cx, cy, dx, dy] of [[-22, -22, 1, 1], [22, -22, -1, 1], [-22, 22, 1, -1], [22, 22, -1, -1]]) { g.moveTo(cx + dx * 7, cy); g.lineTo(cx, cy); g.lineTo(cx, cy + dy * 7); } g.stroke();
+
+  g.save();
+  const blink = Math.floor(time * 6) % 2;
+  if (type === 'flume') {
+    g.strokeStyle = '#2a6f99'; g.lineWidth = 9; g.beginPath(); g.ellipse(0, 0, 17, 13, 0, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = d.color; g.lineWidth = 6; g.stroke();
+    g.fillStyle = '#5c7f5a'; g.beginPath(); g.ellipse(0, 0, 9, 6, 0, 0, Math.PI * 2); g.fill();
+    const a = time * 1.6, bx = Math.cos(a) * 17, by = Math.sin(a) * 13;
+    g.translate(bx, by); g.rotate(Math.atan2(Math.cos(a) * 13, -Math.sin(a) * 17));
+    g.fillStyle = '#8a5a2e'; g.strokeStyle = '#3b240f'; g.lineWidth = 1.2; rr(g, -8, -4, 16, 8, 4); g.fill(); g.stroke();
+    g.fillStyle = '#ffd7a8'; circle(g, -2, 0, 2); g.fill(); circle(g, 3, 0, 2); g.fill();
+  } else {
+    let off = 0;
+    if (type === 'bumper' && t && t.bump > 0) off = Math.sin(t.bump / .18 * Math.PI) * 8;
+    g.rotate(ang); g.translate(off, 0);
+    g.fillStyle = 'rgba(0,0,0,.35)'; rr(g, -19, -10, 40, 24, 6); g.fill();
+    if (type === 'police') {
+      wheels(g, 38, 20, [-.3, .3]);
+      carBody(g, 38, 20, '#1d2330');
+      g.fillStyle = '#f2f2f2'; g.fillRect(-8, -10, 18, 20);
+      glass(g, 7, -8, 5, 16); glass(g, -12, -8, 4, 16);
+      g.fillStyle = blink ? '#ff3b3b' : '#7a1c1c'; g.fillRect(-2, -8, 4, 7);
+      g.fillStyle = blink ? '#2f5fc9' : '#5ba0ff'; g.fillRect(-2, 1, 4, 7);
+    } else if (type === 'fire') {
+      wheels(g, 44, 20, [-.32, -.12, .3]);
+      carBody(g, 44, 20, '#d8322b');
+      g.fillStyle = '#a8231d'; rr(g, 9, -10, 13, 20, 4); g.fill();
+      glass(g, 16, -8, 4, 16);
+      g.strokeStyle = '#cfd4d8'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(-20, -4); g.lineTo(8, -4); g.moveTo(-20, 4); g.lineTo(8, 4);
+      for (let i = -18; i <= 6; i += 4) { g.moveTo(i, -4); g.lineTo(i, 4); } g.stroke();
+      g.fillStyle = '#9aa3a8'; circle(g, 6, 0, 3); g.fill();
+      g.fillStyle = blink ? '#ffe46b' : '#b38b1e'; g.fillRect(11, -3, 2, 6);
+    } else if (type === 'dump') {
+      wheels(g, 44, 22, [-.32, -.12, .32]);
+      carBody(g, 44, 22, '#6f757a', 4);
+      g.fillStyle = '#4c5156'; rr(g, -19, -8, 24, 16, 2); g.fill();
+      g.fillStyle = '#8b6b45'; for (const [rx, ry, rs] of [[-14, -3, 3.5], [-8, 2, 4], [-2, -3, 3], [-12, 4, 2.5]]) { circle(g, rx, ry, rs); g.fill(); }
+      g.fillStyle = '#f0b429'; g.strokeStyle = '#141414'; g.lineWidth = 1.5; rr(g, 8, -11, 14, 22, 4); g.fill(); g.stroke();
+      glass(g, 16, -8, 4, 16);
+    } else if (type === 'bumper') {
+      g.strokeStyle = '#1a1a1a'; g.lineWidth = 5; rr(g, -15, -13, 30, 26, 12); g.stroke();
+      g.fillStyle = d.color; rr(g, -15, -13, 30, 26, 12); g.fill();
+      g.fillStyle = '#2a1830'; circle(g, -3, 0, 6); g.fill();
+      g.fillStyle = '#fff6c8'; circle(g, 12, -6, 2); g.fill(); circle(g, 12, 6, 2); g.fill();
+      g.shadowColor = '#ffe46b'; g.shadowBlur = 10; g.fillStyle = '#ffe46b'; circle(g, -9, 0, 2.5); g.fill(); g.shadowBlur = 0;
+    } else if (type === 'taxi') {
+      wheels(g, 36, 20, [-.3, .3]);
+      carBody(g, 36, 20, d.color);
+      glass(g, 5, -8, 5, 16); glass(g, -12, -8, 4, 16);
+      g.fillStyle = '#1a1a1a'; for (let i = 0; i < 6; i++) { g.fillRect(-10 + i * 4, -10, 2, 2); g.fillRect(-8 + i * 4, 8, 2, 2); }
+      g.fillStyle = '#fffdf0'; g.strokeStyle = '#1a1a1a'; g.lineWidth = 1; rr(g, -4, -5, 7, 10, 1.5); g.fill(); g.stroke();
+      g.fillStyle = '#1a1a1a'; g.fillRect(-1.5, -3, 2, 6);
+    } else if (type === 'crane') {
+      wheels(g, 36, 22, [-.3, 0, .3]);
+      carBody(g, 36, 22, '#e0a21a', 4);
+      g.fillStyle = '#3b3f43'; rr(g, -14, -8, 12, 16, 2); g.fill();
+      g.fillStyle = '#c9870e'; g.strokeStyle = '#141414'; g.lineWidth = 1.2; rr(g, -4, -3.5, 36, 7, 2); g.fill(); g.stroke();
+      g.strokeStyle = '#7a5208'; g.lineWidth = 1; g.beginPath(); for (let i = 0; i < 32; i += 5) { g.moveTo(i - 4, -3.5); g.lineTo(i + 1, 3.5); } g.stroke();
+      glass(g, -12, -6, 4, 12);
+      g.fillStyle = '#2b2b2b'; circle(g, 30, 0, 4); g.fill();
+    } else if (type === 'tank') {
+      g.fillStyle = '#26281d'; rr(g, -20, -13, 40, 7, 2); g.fill(); rr(g, -20, 6, 40, 7, 2); g.fill();
+      g.strokeStyle = '#4b4e3a'; g.lineWidth = 1; g.beginPath(); for (let i = -18; i < 20; i += 4) { g.moveTo(i, -13); g.lineTo(i, -6); g.moveTo(i, 6); g.lineTo(i, 13); } g.stroke();
+      carBody(g, 34, 14, '#6b7a3a', 3);
+      g.fillStyle = '#3a3f2a'; g.fillRect(6, -2, 22, 4);
+      g.fillStyle = '#55622c'; g.strokeStyle = '#141414'; g.lineWidth = 1.5; circle(g, 0, 0, 8); g.fill(); g.stroke();
+      g.fillStyle = '#e2b54a'; circle(g, -3, 0, 1.6); g.fill();
+    }
+  }
+  g.restore();
+  g.fillStyle = '#e2b54a';
+  for (let i = 0; i < lv; i++) { circle(g, -(lv - 1) * 4 + i * 8, 22, 2.4); g.fill(); }
+  g.restore();
+}
+
+function drawEnemy(g, e) {
+  const d = ENEMIES[e.type], r = ER;
+  const ahead = posAt(e.d + 2), ang = Math.atan2(ahead.y - e.y, ahead.x - e.x);
+  const wob = 1 + Math.sin(time * 9 + e.d * .05) * .06;
+  g.save(); g.translate(e.x, e.y);
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(2, r * .7, r, r * .45, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = e.flash > 0 ? '#ffffff' : d.color; g.strokeStyle = '#1b1510'; g.lineWidth = 2;
+  g.beginPath(); g.ellipse(0, 0, r * wob, r / wob, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.35)'; circle(g, -4, -5, 3); g.fill();
+  const ex = Math.cos(ang) * 3, ey = Math.sin(ang) * 3;
+  g.fillStyle = '#ffffff'; circle(g, ex - 4, ey - 1, 3.4); g.fill(); circle(g, ex + 4, ey - 1, 3.4); g.fill();
+  g.fillStyle = '#141414'; circle(g, ex * 1.4 - 4, ey * 1.4 - 1, 1.7); g.fill(); circle(g, ex * 1.4 + 4, ey * 1.4 - 1, 1.7); g.fill();
+  g.restore();
+  if (e.slowT > 0) { g.strokeStyle = 'rgba(134,208,238,.85)'; g.lineWidth = 2; circle(g, e.x, e.y, r + 3); g.stroke(); }
+  if (e.hp < e.maxHp) {
+    const w = Math.max(22, r * 2), p = Math.max(0, e.hp / e.maxHp);
+    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(e.x - w / 2, e.y - r - 10, w, 4);
+    g.fillStyle = p > .5 ? '#a5d46a' : p > .25 ? '#e2b54a' : '#e65a4f'; g.fillRect(e.x - w / 2, e.y - r - 10, w * p, 4);
+  }
+}
+
+// ---------- state ----------
+let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0;
+function reset() {
+  S = { gold: 180, lives: 20, wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1 };
+  occ = new Map(); build = null; sel = null; paused = false;
+  document.getElementById('overlay').hidden = true;
+}
+
+function canPlace(c, r) { return c >= 0 && c < COLS && r >= 0 && r < ROWS && !onPath(c, r) && !occ.has(c + ',' + r); }
+function place(type, c, r) {
+  const cost = TOWERS[type].cost;
+  if (!canPlace(c, r) || S.gold < cost) return false;
+  S.gold -= cost;
+  const t = { type, c, r, x: (c + .5) * T, y: (r + .5) * T, lv: 1, cd: 0, ang: -Math.PI / 2, invested: cost, kills: 0 };
+  S.towers.push(t); occ.set(c + ',' + r, t);
+  ring(t.x, t.y, 10, 34, TOWERS[type].color, .35);
+  return true;
+}
+function upgrade(t) {
+  if (!t || t.lv >= 3) return; const c = upCost(t); if (S.gold < c) return;
+  S.gold -= c; t.invested += c; t.lv++;
+  ring(t.x, t.y, 12, stats(t).range, '#e2b54a', .45);
+}
+function sell(t) {
+  if (!t) return; S.gold += refund(t);
+  floatText(t.x, t.y - 10, '+' + refund(t), '#e2b54a');
+  S.towers = S.towers.filter(o => o !== t); occ.delete(t.c + ',' + t.r);
+  if (sel === t) sel = null;
+}
+function startWave() {
+  if (S.waveActive || S.over || S.wave >= MAX_WAVE) return;
+  S.wave++; S.queue = buildWave(S.wave); S.spawnT = 0; S.waveActive = true; S.autoT = -1;
+}
+
+// ---------- effects ----------
+function ring(x, y, r0, r1, color, life) { S.fx.push({ k: 'ring', x, y, r0, r1, color, life, max: life }); }
+function floatText(x, y, txt, color) { S.fx.push({ k: 'text', x, y, txt, color, life: .9, max: .9 }); }
+function sparks(x, y, color, n) {
+  if (reduceMotion) return;
+  for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = 40 + Math.random() * 120; S.fx.push({ k: 'spark', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, color, life: .35 + Math.random() * .2, max: .5 }); }
+}
+function jagged(points) {
+  const out = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+    for (let s = 1; s < 4; s++) { const t = s / 4, o = (Math.random() - .5) * 14; out.push({ x: a.x + dx * t + nx * o, y: a.y + dy * t + ny * o }); }
+    out.push(b);
+  }
+  return out;
+}
+
+// ---------- simulation ----------
+function hurt(e, dmg, src) {
+  if (!e.alive) return;
+  e.hp -= dmg; e.flash = .07;
+  if (e.hp <= 0) {
+    e.alive = false;
+    const rw = ENEMIES[e.type].reward + Math.floor(S.wave / 4);
+    S.gold += rw; if (src) src.kills++;
+    floatText(e.x, e.y - 12, '+' + rw, '#e2b54a');
+    sparks(e.x, e.y, ENEMIES[e.type].color, e.type === 'boss' ? 26 : 8);
+    if (e.type === 'boss') ring(e.x, e.y, 10, 90, '#e65a4f', .6);
+  }
+}
+function spawn(type) {
+  const d = ENEMIES[type], scale = Math.pow(1.145, S.wave - 1), hp = d.hp * scale;
+  const p = posAt(0);
+  S.enemies.push({ type, hp, maxHp: hp, d: 0, x: p.x, y: p.y, alive: true, slowT: 0, slowF: 0, flash: 0 });
+}
+function slowDown(e, slow, dur) { if (e.slowT <= 0 || slow >= e.slowF) e.slowF = slow; e.slowT = Math.max(e.slowT, dur); }
+function fire(t, e, st) {
+  const nx = t.x + Math.cos(t.ang) * 20, ny = t.y + Math.sin(t.ang) * 20;
+  if (t.type === 'police' || t.type === 'fire' || t.type === 'tank') {
+    const k = { police: 'bullet', fire: 'drop', tank: 'shell' }[t.type], sp = { police: 700, fire: 420, tank: 820 }[t.type];
+    S.proj.push({ k, x: nx, y: ny, tg: e, tx: e.x, ty: e.y, sp, dmg: st.dmg, slow: st.slow, slowDur: st.slowDur, src: t, ang: t.ang });
+    if (t.type === 'tank') ring(nx, ny, 3, 14, '#ffcf6b', .18);
+  } else if (t.type === 'dump' || t.type === 'crane') {
+    const crane = t.type === 'crane';
+    const dist = Math.hypot(e.x - t.x, e.y - t.y), dur = crane ? .45 : Math.max(.3, dist / 340);
+    const sp = ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1);
+    const p = posAt(e.d + sp * dur);
+    const sx = crane ? t.x + Math.cos(t.ang) * 30 : t.x, sy = crane ? t.y + Math.sin(t.ang) * 30 : t.y;
+    S.proj.push({ k: crane ? 'wreck' : 'rock', sx, sy, tx: p.x, ty: p.y, x: sx, y: sy, t: 0, dur, arc: crane ? 26 : 46, dmg: st.dmg, splash: st.splash, src: t });
+  } else if (t.type === 'bumper') {
+    hurt(e, st.dmg, t); t.bump = .18;
+    if (e.alive) { e.d = Math.max(0, e.d - st.knock * (e.type === 'boss' ? .25 : 1)); const p = posAt(e.d); e.x = p.x; e.y = p.y; }
+    ring(e.x, e.y, 4, 18, '#ff5fa2', .22);
+  } else if (t.type === 'flume') {
+    for (const o of S.enemies) {
+      if (!o.alive || (o.x - t.x) ** 2 + (o.y - t.y) ** 2 > st.range * st.range) continue;
+      hurt(o, st.dmg, t); if (o.alive) slowDown(o, st.slow, st.slowDur);
+    }
+    ring(t.x, t.y, 10, st.range, '#8fd6ff', .45);
+  }
+}
+
+function update(dt) {
+  for (const f of S.fx) { f.life -= dt; if (f.k === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } if (f.k === 'text') f.y -= 26 * dt; }
+  S.fx = S.fx.filter(f => f.life > 0);
+  if (S.over) return;
+
+  if (S.waveActive && S.queue.length) {
+    S.spawnT -= dt;
+    if (S.spawnT <= 0) { const q = S.queue.shift(); spawn(q.type); S.spawnT = q.gap; }
+  }
+  for (const e of S.enemies) {
+    if (!e.alive) continue;
+    if (e.flash > 0) e.flash -= dt;
+    if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
+    e.d += ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * dt;
+    if (e.d >= PATH_LEN) { e.alive = false; S.lives -= ENEMIES[e.type].lives; ring(W - 14, 8.5 * T, 6, 50, '#e65a4f', .5); continue; }
+    const p = posAt(e.d); e.x = p.x; e.y = p.y;
+  }
+  for (const t of S.towers) {
+    if (t.bump > 0) t.bump -= dt;
+    if (t.type === 'taxi') continue;
+    t.cd -= dt; const st = stats(t), r2 = st.range * st.range;
+    let best = null;
+    for (const e of S.enemies) { if (!e.alive) continue; if ((e.x - t.x) ** 2 + (e.y - t.y) ** 2 <= r2 && (!best || e.d > best.d)) best = e; }
+    if (best) {
+      if (t.type !== 'flume') t.ang = Math.atan2(best.y - t.y, best.x - t.x);
+      if (t.cd <= 0) { fire(t, best, st); t.cd = st.rate; }
+    }
+  }
+  for (const p of S.proj) {
+    if (p.k === 'rock' || p.k === 'wreck') {
+      p.t += dt; const k = Math.min(1, p.t / p.dur);
+      p.x = p.sx + (p.tx - p.sx) * k; p.y = p.sy + (p.ty - p.sy) * k; p.h = Math.sin(Math.PI * k) * p.arc;
+      if (k >= 1) {
+        p.dead = true;
+        for (const e of S.enemies) { if (!e.alive) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d <= p.splash) hurt(e, p.dmg * (1 - .4 * d / p.splash), p.src); }
+        ring(p.x, p.y, 6, p.splash, p.k === 'rock' ? '#c9a46b' : '#d7dde0', .35); sparks(p.x, p.y, '#b08a5a', 6);
+      }
+    } else {
+      if (p.tg.alive) { p.tx = p.tg.x; p.ty = p.tg.y; }
+      const dx = p.tx - p.x, dy = p.ty - p.y, dist = Math.hypot(dx, dy), step = p.sp * dt;
+      p.ang = Math.atan2(dy, dx);
+      if (dist <= step + 4) {
+        p.dead = true;
+        if (p.tg.alive) {
+          hurt(p.tg, p.dmg, p.src);
+          if (p.k === 'drop' && p.tg.alive) slowDown(p.tg, p.slow, p.slowDur);
+        }
+        if (p.k === 'drop') ring(p.tx, p.ty, 4, 16, '#86d0ee', .25);
+        if (p.k === 'shell') { ring(p.tx, p.ty, 4, 22, '#ffcf6b', .25); sparks(p.tx, p.ty, '#ffcf6b', 5); }
+      } else { p.x += dx / dist * step; p.y += dy / dist * step; }
+    }
+  }
+  S.proj = S.proj.filter(p => !p.dead);
+  S.enemies = S.enemies.filter(e => e.alive);
+
+  if (S.lives <= 0) { S.lives = 0; endGame(false); return; }
+  if (S.waveActive && !S.queue.length && !S.enemies.length) {
+    S.waveActive = false;
+    const bonus = 20 + S.wave * 3; S.gold += bonus;
+    floatText(W / 2, H / 2, '웨이브 ' + S.wave + ' 방어 · 보너스 +' + bonus, '#e2b54a');
+    S.fx[S.fx.length - 1].life = S.fx[S.fx.length - 1].max = 2;
+    for (const t of S.towers) if (t.type === 'taxi') { const fare = stats(t).income; S.gold += fare; t.earned = (t.earned || 0) + fare; floatText(t.x, t.y - 26, '요금 +' + fare, '#f7c600'); }
+    if (S.wave >= MAX_WAVE) { endGame(true); return; }
+    if (document.getElementById('autoChk').checked) S.autoT = 2;
+  }
+  if (S.autoT > 0) { S.autoT -= dt; if (S.autoT <= 0) startWave(); }
+}
+
+function endGame(won) {
+  S.over = true; S.won = won; build = null;
+  document.getElementById('ovEyebrow').textContent = won ? '승리' : '전투 종료';
+  document.getElementById('ovTitle').textContent = won ? '협곡을 지켜냈습니다' : '성문이 무너졌습니다';
+  document.getElementById('ovText').textContent = won
+    ? '20개 웨이브를 모두 막아냈습니다. 남은 성문 내구도 ' + S.lives + '.'
+    : '웨이브 ' + S.wave + '에서 무너졌습니다. 탑 ' + S.towers.length + '개가 싸웠습니다.';
+  document.getElementById('overlay').hidden = false;
+}
+
+// ---------- render ----------
+function render() {
+  ctx.drawImage(bg, 0, 0, W, H);
+  const showRange = (x, y, r, color) => {
+    if (!r) return;
+    ctx.fillStyle = color + '1f'; ctx.strokeStyle = color + 'aa'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 6]);
+    circle(ctx, x, y, r); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+  };
+  if (sel) showRange(sel.x, sel.y, stats(sel).range, TOWERS[sel.type].color);
+  if (hover && !build && !S.over) {
+    const t = occ.get(hover.c + ',' + hover.r);
+    if (!t && canPlace(hover.c, hover.r)) { ctx.fillStyle = 'rgba(235,230,211,.06)'; ctx.fillRect(hover.c * T, hover.r * T, T, T); }
+  }
+  for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
+  if (sel) { ctx.strokeStyle = '#e2b54a'; ctx.lineWidth = 2; rr(ctx, sel.x - 27, sel.y - 27, 54, 54, 10); ctx.stroke(); }
+  const sorted = S.enemies.slice().sort((a, b) => a.y - b.y);
+  for (const e of sorted) drawEnemy(ctx, e);
+  for (const p of S.proj) {
+    if (p.k === 'bullet' || p.k === 'drop' || p.k === 'shell') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
+      if (p.k === 'bullet') { ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(3, 0); ctx.stroke(); }
+      else if (p.k === 'drop') { ctx.fillStyle = 'rgba(143,214,255,.5)'; ctx.beginPath(); ctx.ellipse(-6, 0, 9, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#dff4ff'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.fillStyle = 'rgba(255,170,60,.6)'; ctx.fillRect(-12, -1.5, 8, 3); ctx.fillStyle = '#3a3a33'; rr(ctx, -4, -2.5, 9, 5, 2); ctx.fill(); }
+      ctx.restore();
+    } else if (p.k === 'rock' || p.k === 'wreck') {
+      const hy = p.y - (p.h || 0);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+      if (p.k === 'wreck') {
+        ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(p.sx, p.sy); ctx.lineTo(p.x, hy); ctx.stroke();
+        ctx.fillStyle = '#34383b'; circle(ctx, p.x, hy, 8); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.25)'; circle(ctx, p.x - 3, hy - 3, 2.5); ctx.fill();
+      } else {
+        ctx.fillStyle = '#8b6b45'; ctx.beginPath(); ctx.moveTo(p.x - 6, hy); ctx.lineTo(p.x - 2, hy - 6); ctx.lineTo(p.x + 5, hy - 4); ctx.lineTo(p.x + 6, hy + 3); ctx.lineTo(p.x, hy + 6); ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+  for (const f of S.fx) {
+    const a = Math.max(0, f.life / f.max);
+    if (f.k === 'ring') { ctx.globalAlpha = a; ctx.strokeStyle = f.color; ctx.lineWidth = 2.5; circle(ctx, f.x, f.y, f.r0 + (f.r1 - f.r0) * (1 - a)); ctx.stroke(); }
+    else if (f.k === 'spark') { ctx.globalAlpha = a; ctx.fillStyle = f.color; ctx.fillRect(f.x - 1.5, f.y - 1.5, 3, 3); }
+    else if (f.k === 'bolt') {
+      ctx.globalAlpha = a; ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(194,166,255,.5)'; ctx.lineWidth = 6; ctx.beginPath(); f.pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+      ctx.strokeStyle = '#f3ecff'; ctx.lineWidth = 2; ctx.stroke();
+    } else if (f.k === 'text') {
+      ctx.globalAlpha = Math.min(1, a * 1.6); ctx.font = '700 14px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctx.strokeText(f.txt, f.x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (build && hover && !S.over) {
+    const ok = canPlace(hover.c, hover.r), x = (hover.c + .5) * T, y = (hover.r + .5) * T, d = TOWERS[build];
+    if (ok) {
+      showRange(x, y, d.range * T, d.color);
+      ctx.globalAlpha = S.gold >= d.cost ? .75 : .35; drawTower(ctx, build, x, y, 1, -Math.PI / 2); ctx.globalAlpha = 1;
+    } else { ctx.fillStyle = 'rgba(230,90,79,.28)'; ctx.fillRect(hover.c * T, hover.r * T, T, T); }
+  }
+  if (S.wave === 0 && !S.waveActive) {
+    ctx.font = '500 13px "IBM Plex Sans KR", sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(235,230,211,.8)';
+    ctx.fillText('적은 여기서 옵니다', 34, 1.5 * T - 34);
+    ctx.textAlign = 'right'; ctx.fillText('성문을 지키세요', W - 34, 8 * T - 30);
+  }
+  if (paused && !S.over) {
+    ctx.fillStyle = 'rgba(8,14,12,.5)'; ctx.fillRect(0, 0, W, H);
+    ctx.font = '400 44px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctx.fillText('일시정지', W / 2, H / 2 + 14);
+  }
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+const shop = $('shop');
+for (const [i, type] of ORDER.entries()) {
+  const d = TOWERS[type];
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'tcard'; b.dataset.type = type; b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = `<canvas width="96" height="96" aria-hidden="true"></canvas><div><div class="nm">${d.name}</div><div class="meta"><span class="cost">${d.cost}</span><span>${i + 1}</span></div></div>`;
+  const g = b.querySelector('canvas').getContext('2d'); g.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(g, type, 30, 32, 1, -.7);
+  b.addEventListener('click', () => toggleBuild(type));
+  shop.appendChild(b);
+}
+function toggleBuild(type) { if (S.over) return; build = build === type ? null : type; sel = null; }
+
+const fmt = n => (Math.round(n * 10) / 10).toString();
+let panelKey = '';
+function refreshUI() {
+  $('sWave').textContent = S.wave + ' / ' + MAX_WAVE;
+  $('sGold').textContent = S.gold;
+  $('sLives').textContent = S.lives;
+  $('sLivesBox').classList.toggle('low', S.lives <= 5);
+  for (const b of shop.children) {
+    const t = b.dataset.type;
+    b.setAttribute('aria-pressed', String(build === t));
+    b.classList.toggle('poor', S.gold < TOWERS[t].cost);
+  }
+  const sb = $('startBtn');
+  sb.disabled = S.waveActive || S.over || S.wave >= MAX_WAVE;
+  sb.textContent = S.waveActive ? '웨이브 ' + S.wave + ' 진행 중' : S.autoT > 0 ? '곧 웨이브 ' + (S.wave + 1) : '웨이브 ' + (S.wave + 1) + ' 시작';
+  $('speedBtn').innerHTML = `<span class="mono">${speed}×</span>`;
+  $('pauseBtn').textContent = paused ? '▶' : '❚❚';
+  $('pauseBtn').setAttribute('aria-label', paused ? '계속하기' : '일시정지');
+
+  let key, html;
+  if (build) {
+    const d = TOWERS[build];
+    key = 'b' + build + (S.gold >= d.cost);
+    html = `<h3>${d.name} <span class="lv">${d.cost} 금화</span></h3><p>${d.desc}</p>
+      <dl class="kv">${d.income ? `<dt>웨이브당 요금</dt><dd>${d.income}</dd>` : `<dt>피해</dt><dd>${d.dmg}${d.splash ? ' · 범위' : ''}${d.pulse ? ' · 주변 전체' : ''}</dd><dt>사거리</dt><dd>${d.range} 칸</dd><dt>공격 간격</dt><dd>${d.rate}초</dd>`}${d.slow ? `<dt>둔화</dt><dd>${Math.round(d.slow * 100)}% · ${d.slowDur}초</dd>` : ''}${d.knock ? `<dt>밀쳐내기</dt><dd>${d.knock} 칸</dd>` : ''}</dl>
+      <p>${S.gold >= d.cost ? '길이 아닌 빈 칸을 눌러 배치하세요.' : '금화가 ' + (d.cost - S.gold) + ' 부족합니다.'}</p>
+      <div class="row"><button class="btn grow" type="button" data-act="cancel">취소</button></div>`;
+  } else if (sel) {
+    const st = stats(sel), d = TOWERS[sel.type], max = sel.lv >= 3, c = max ? 0 : upCost(sel);
+    const nx = max ? null : stats({ type: sel.type, lv: sel.lv + 1 });
+    key = 's' + S.towers.indexOf(sel) + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c);
+    const up = (a, b) => nx ? ` <span class="up">→ ${b}</span>` : '';
+    html = `<h3>${d.name} <span class="lv">Lv.${sel.lv}${max ? ' · 최대' : ''}</span></h3>
+      <dl class="kv">${st.income ? `<dt>웨이브당 요금</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>번 요금</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
+      ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
+      <dt>처치</dt><dd>${sel.kills}</dd>`}</dl>
+      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell">판매 <span class="mono">+${refund(sel)}</span></button></div>`;
+  } else {
+    const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
+    const counts = {}; for (const q of buildWave(nextW)) counts[q.type] = (counts[q.type] || 0) + 1;
+    key = 'i' + nextW + S.waveActive;
+    html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
+      <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:${ENEMIES[k].color}"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
+      <p>젤리는 모두 같은 모양이고 색깔로 구분합니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 빨강 젤리가 옵니다. 세워 둔 차를 누르면 강화하거나 판매할 수 있습니다.</p>`;
+  }
+  if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
+}
+$('panel').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act;
+  if (a === 'cancel') build = null;
+  if (a === 'up') upgrade(sel);
+  if (a === 'sell') sell(sel);
+  panelKey = '';
+});
+$('startBtn').addEventListener('click', startWave);
+$('speedBtn').addEventListener('click', () => { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; });
+$('pauseBtn').addEventListener('click', () => { paused = !paused; });
+$('restartBtn').addEventListener('click', () => { reset(); panelKey = ''; });
+
+function tileAt(ev) {
+  const r = cv.getBoundingClientRect();
+  const x = (ev.clientX - r.left) / r.width * W, y = (ev.clientY - r.top) / r.height * H;
+  const c = Math.floor(x / T), row = Math.floor(y / T);
+  return c >= 0 && c < COLS && row >= 0 && row < ROWS ? { c, r: row } : null;
+}
+cv.addEventListener('pointermove', e => { hover = tileAt(e); });
+cv.addEventListener('pointerdown', e => { hover = tileAt(e); });
+cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hover = null; });
+cv.addEventListener('click', e => {
+  if (S.over) return;
+  const h = tileAt(e); if (!h) return;
+  const t = occ.get(h.c + ',' + h.r);
+  if (build) {
+    if (canPlace(h.c, h.r)) { if (place(build, h.c, h.r) && !e.shiftKey) build = null; }
+    else if (t) { sel = t; build = null; }
+    return;
+  }
+  sel = t || null;
+});
+cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel = null; });
+window.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input')) return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= ORDER.length) toggleBuild(ORDER[n - 1]);
+  else if (e.key === 'Escape') { build = null; sel = null; }
+  else if (e.code === 'Space') { e.preventDefault(); startWave(); }
+  else if (e.key === 'u' || e.key === 'U') upgrade(sel);
+  else if (e.key === 'x' || e.key === 'X' || e.key === 'Delete') sell(sel);
+  else if (e.key === 'p' || e.key === 'P') paused = !paused;
+  else if (e.key === 'f' || e.key === 'F') speed = speed === 1 ? 2 : speed === 2 ? 3 : 1;
+});
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!paused) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
+  render(); refreshUI();
+  requestAnimationFrame(frame);
+}
+
+function start(data) {
+  reset();
+  if (data && Array.isArray(data.towers) && !data.over) {
+    S.gold = data.gold; S.lives = data.lives; S.wave = data.wave;
+    for (const t of data.towers) { if (!TOWERS[t.type]) continue; S.gold += TOWERS[t.type].cost; place(t.type, t.c, t.r); const p = occ.get(t.c + ',' + t.r); if (p) { p.lv = t.lv; p.invested = t.invested; p.kills = t.kills; } }
+    S.fx = [];
+  }
+  requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
+}
+window.claude?.hot?.snapshot?.(() => ({
+  gold: S.gold, lives: S.lives, wave: S.waveActive ? S.wave - 1 : S.wave, over: S.over,
+  towers: S.towers.map(t => ({ type: t.type, c: t.c, r: t.r, lv: t.lv, invested: t.invested, kills: t.kills })),
+}));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
