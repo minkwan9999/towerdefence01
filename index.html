@@ -1678,6 +1678,8 @@ function updateAffUI() {
   const P = curP(), el = $('chatAff');
   if (el) { el.hidden = !P || picking; if (P) el.textContent = '💗 ' + Math.floor(affOf(P)); }
   itemsKey = '';
+  // 로비의 호감도 상점도 바로 다시 그려서, 오른 호감도로 곧바로 살 수 있게 합니다.
+  if (inLobby && typeof renderAffShop === 'function') renderAffShop();
 }
 
 let quizDeck = [];
