@@ -129,7 +129,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .stat.slowfx .v { color: var(--slowfx); }
 .chat {
   position: fixed; z-index: 50;
-  right: max(16px, env(safe-area-inset-right, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   width: min(360px, calc(100vw - 32px)); height: min(560px, calc(100vh - 32px));
   display: flex; flex-direction: column; overflow: hidden;
@@ -180,7 +180,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .chip .ic { font-size: 20px; flex: none; }
 .chip .t { font-weight: 700; display: block; }
 .chip .s { font-size: 12px; color: var(--k-sub); display: block; }
-.chip:focus-visible, .chat-x:focus-visible { outline: 2px solid #3a6ea5; outline-offset: 2px; }
+.chat-compose { background: #ffffff; padding: 8px 10px 10px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; border-top: 1px solid rgba(0, 0, 0, .08); }
+.chat-replies:not(:empty) + .chat-compose { border-top: 0; }
+.chat-suggest { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.chat-suggest:empty { display: none; }
+.pill { flex: none; font: inherit; font-size: 13px; color: var(--k-text); background: #f1f3f5; border: 1px solid #dde2e6; border-radius: 16px; padding: 5px 11px; cursor: pointer; }
+.pill:hover { background: #e7ebee; }
+.chat-form { display: flex; gap: 6px; }
+.chat-form input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: var(--k-text); background: #f5f6f7; border: 1px solid #dde2e6; border-radius: 18px; padding: 8px 14px; color-scheme: light; }
+.chat-form input:disabled { background: #eceff1; }
+.chat-form button { font: inherit; font-weight: 700; font-size: 14px; border: 0; border-radius: 18px; padding: 0 16px; background: var(--k-yellow); color: var(--k-text); cursor: pointer; }
+.chat-form button:disabled { opacity: .45; cursor: default; }
+.chip:focus-visible, .chat-x:focus-visible, .pill:focus-visible, .chat-form button:focus-visible, .chat-form input:focus-visible { outline: 2px solid #3a6ea5; outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -232,11 +243,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 <div class="chat" id="chat" role="dialog" aria-label="차량과 대화" hidden>
   <div class="chat-head">
     <canvas id="chatAvatar" width="76" height="76" aria-hidden="true"></canvas>
-    <div><div class="chat-name" id="chatName">경찰차</div><div class="chat-sub">퀴즈를 맞히면 선물을 줘요</div></div>
+    <div><div class="chat-name" id="chatName">경찰차</div><div class="chat-sub">수다 떨다 보면 퀴즈를 낼지도 몰라요</div></div>
     <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">×</button>
   </div>
   <div class="chat-body" id="chatBody"></div>
   <div class="chat-replies" id="chatReplies"></div>
+  <div class="chat-compose">
+    <div class="chat-suggest" id="chatSuggest"></div>
+    <form class="chat-form" id="chatForm" autocomplete="off">
+      <input id="chatInput" type="text" maxlength="80" placeholder="메시지 입력" aria-label="메시지 입력">
+      <button id="chatSend" type="submit">전송</button>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -522,7 +540,7 @@ function place(type, c, r) {
   if (!canPlace(c, r) || S.gold < cost) return false;
   S.gold -= cost;
   const t = { type, c, r, x: (c + .5) * T, y: (r + .5) * T, lv: 1, cd: 0, ang: -Math.PI / 2, invested: cost, kills: 0 };
-  S.towers.push(t); occ.set(c + ',' + r, t);
+  S.towers.push(t); occ.set(c + ',' + r, t); initChat(t);
   ring(t.x, t.y, 10, 34, TOWERS[type].color, .35);
   return true;
 }
@@ -536,6 +554,7 @@ function sell(t) {
   floatText(t.x, t.y - 10, '+' + refund(t), '#e2b54a');
   S.towers = S.towers.filter(o => o !== t); occ.delete(t.c + ',' + t.r);
   if (sel === t) sel = null;
+  if (chatT === t) closeChat();
 }
 function startWave() {
   if (S.waveActive || S.over || S.wave >= MAX_WAVE) return;
@@ -667,6 +686,7 @@ function update(dt) {
     const bonus = 20 + S.wave * 3; S.gold += bonus;
     floatText(W / 2, H / 2, '웨이브 ' + S.wave + ' 방어 · 보너스 +' + bonus, '#e2b54a');
     S.fx[S.fx.length - 1].life = S.fx[S.fx.length - 1].max = 2;
+    onWaveCleared();
     for (const t of S.towers) if (t.type === 'taxi') { const fare = stats(t).income; S.gold += fare; t.earned = (t.earned || 0) + fare; floatText(t.x, t.y - 26, '요금 +' + fare, '#f7c600'); }
     if (S.wave >= MAX_WAVE) { endGame(true); return; }
     if (document.getElementById('autoChk').checked) S.autoT = 2;
@@ -698,6 +718,12 @@ function render() {
     if (!t && canPlace(hover.c, hover.r)) { ctx.fillStyle = 'rgba(235,230,211,.06)'; ctx.fillRect(hover.c * T, hover.r * T, T, T); }
   }
   for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
+  for (const t of S.towers) if (t.unread > 0) {
+    const bx = t.x + 20, by = t.y - 22;
+    ctx.fillStyle = '#ef4f45'; circle(ctx, bx, by, 9); ctx.fill();
+    ctx.strokeStyle = '#0e1714'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.fillText(String(Math.min(9, t.unread)), bx, by + 4);
+  }
   if (sel) { ctx.strokeStyle = '#e2b54a'; ctx.lineWidth = 2; rr(ctx, sel.x - 27, sel.y - 27, 54, 54, 10); ctx.stroke(); }
   const sorted = S.enemies.slice().sort((a, b) => a.y - b.y);
   for (const e of sorted) drawEnemy(ctx, e);
@@ -804,14 +830,15 @@ function refreshUI() {
       <dl class="kv">${st.income ? `<dt>웨이브당 요금</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>번 요금</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
       ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
       <dt>처치</dt><dd>${sel.kills}</dd>`}${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
-      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell">판매 <span class="mono">+${refund(sel)}</span></button></div>`;
+      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell">판매 <span class="mono">+${refund(sel)}</span></button></div>
+      <button class="btn" type="button" data-act="chat">💬 ${TOWERS[sel.type].name}와 대화하기</button>`;
   } else {
     const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
     const counts = {}; for (const q of buildWave(nextW)) counts[q.type] = (counts[q.type] || 0) + 1;
     key = 'i' + nextW + S.waveActive;
     html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
-      <p>적군은 우리와 똑같은 차량을 검게 칠한 것입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 차를 누르면 강화하거나 판매할 수 있습니다.</p>`;
+      <p>적군은 우리와 똑같은 차량을 검게 칠한 것입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 차를 누르면 대화하고, 강화하거나 판매할 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 차가 퀴즈를 냅니다.</p>`;
   }
   if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
 }
@@ -821,6 +848,7 @@ $('panel').addEventListener('click', e => {
   if (a === 'cancel') build = null;
   if (a === 'up') upgrade(sel);
   if (a === 'sell') sell(sel);
+  if (a === 'chat' && sel) openChat(sel);
   panelKey = '';
 });
 $('startBtn').addEventListener('click', startWave);
@@ -842,17 +870,18 @@ cv.addEventListener('click', e => {
   const h = tileAt(e); if (!h) return;
   const t = occ.get(h.c + ',' + h.r);
   if (build) {
-    if (canPlace(h.c, h.r)) { const type = build; if (place(type, h.c, h.r)) { if (!e.shiftKey) build = null; openChat(occ.get(h.c + ',' + h.r)); } }
-    else if (t) { sel = t; build = null; }
+    if (canPlace(h.c, h.r)) { const type = build; if (place(type, h.c, h.r)) { if (!e.shiftKey) build = null; greet(occ.get(h.c + ',' + h.r)); } }
+    else if (t) { sel = t; build = null; openChat(t); }
     return;
   }
   sel = t || null;
+  if (t) openChat(t);
 });
 cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel = null; });
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input')) return;
   const n = parseInt(e.key, 10);
-  if (chat) {
+  if (chatT) {
     const chips = chatReplies.querySelectorAll('.chip');
     if (n >= 1 && n <= chips.length) chips[n - 1].click();
     else if (e.key === 'Escape') closeChat();
@@ -913,16 +942,66 @@ const QUIZ = [
   ['카멜레온이 몸 색을 바꾸는 주된 이유로 알려진 것은?', '기분과 체온 조절', ['배가 고파서', '잠이 와서', '털갈이']],
   ['신호등에서 "멈춤"을 뜻하는 색은?', '빨강', ['초록', '노랑', '파랑']],
 ];
-const GREET = {
-  police: ['충성! 경찰차 출동했습니다 🚓', '이 길목은 제가 지킬게요.'],
-  fire:   ['안녕하세요! 소방차예요 🚒', '불이든 적이든 시원하게 꺼 드릴게요.'],
-  dump:   ['덤프트럭 도착~ 🚛', '돌 한가득 싣고 왔어요. 쏟을 준비 끝!'],
-  bumper: ['범퍼카 등장! 🎢', '다가오는 놈들은 쿵! 하고 밀어 버릴게요 ㅋㅋ'],
-  taxi:   ['손님, 어디로 모실까요? 🚕', '저는 싸움 대신 요금 벌어 올게요.'],
-  crane:  ['크레인입니다 🏗️', '높은 데서 보니까 적들이 다 보이네요.'],
-  flume:  ['후룸라이드 개장했어요! 💦', '근처 오는 애들 다 젖을 각오 해야 할걸요?'],
-  tank:   ['탱크 배치 완료. 🪖', '사거리 안에 들어오면 전부 맞힙니다.'],
+const PERSONA = {
+  police: { hi: ['충성! 경찰차 출동했습니다 🚓', '근무 중이지만 수다는 환영이에요. 저 눌러서 말 걸어 주세요!'],
+    me: '이 길목 치안 담당 경찰차예요. 사이렌 소리가 제 자랑이죠 🚨', food: '근무 중엔 역시 도넛이죠 🍩', hobby: '취미는 순찰… 아니 드라이브요 ㅎㅎ', dream: '무사고로 1만 일 근무하는 게 꿈이에요!', age: '나이는 비밀, 순찰 경력은 꽤 길어요 👮' },
+  fire: { hi: ['안녕하세요! 소방차예요 🚒', '불 얘기 말고 다른 얘기도 좋아요. 심심하면 불러 주세요!'],
+    me: '물탱크 가득 실은 소방차예요. 사다리 타는 게 특기!', food: '시원한 물이면 충분해요 💧 …사실 라면은 좋아해요', hobby: '호스 돌돌 마는 거 은근 재밌어요', dream: '불 하나 없는 평화로운 하루가 꿈이에요', age: '사다리 길이는 알려 줘도 나이는 비밀!' },
+  dump: { hi: ['덤프트럭 도착~ 🚛', '돌 쏟을 준비 끝! 쉬는 시간엔 말 걸어도 돼요.'],
+    me: '짐칸 가득 돌 싣고 다니는 덤프트럭이에요. 힘 하나는 자신 있죠', food: '저는 경유 든든하게 먹으면 돼요 ⛽', hobby: '모래 쌓아서 산 만들기요 ⛰️', dream: '언젠가 진짜 큰 다리 짓는 현장에 가 보고 싶어요', age: '바퀴 수로 치면 꽤 어른이에요 ㅋㅋ' },
+  bumper: { hi: ['범퍼카 등장! 🎢', '쿵쿵 박는 거 말고 수다도 잘 떨어요. 놀아 줘요!'],
+    me: '놀이공원에서 온 범퍼카예요! 부딪히는 게 제 일이자 놀이죠', food: '솜사탕이랑 츄러스요 🍭', hobby: '빙글빙글 돌기! 어지러운 게 좋아요', dream: '세상에서 제일 신나는 범퍼카 되기!', age: '마음은 영원한 열 살이에요 ㅎㅎ' },
+  taxi: { hi: ['손님, 어디로 모실까요? 🚕', '싸움 대신 요금 벌어 올게요. 가는 길에 말동무 해 주세요!'],
+    me: '협곡 전용 택시예요. 기본요금 받고 열심히 달리죠', food: '기사식당 제육볶음이 최고예요 🍚', hobby: '라디오 들으면서 손님이랑 수다 떨기요', dream: '전국 일주 손님 한번 태워 보는 거요!', age: '주행거리는 묻지 말아 주세요 😅' },
+  crane: { hi: ['크레인입니다 🏗️', '높은 데서 보면 다 보여요. 궁금한 거 물어보세요.'],
+    me: '무거운 거 번쩍 드는 크레인이에요. 쇠공 떨어뜨리는 게 특기', food: '저는 바람만 맞아도 배불러요 🍃', hobby: '높은 데서 구름 구경하기', dream: '세계에서 제일 높은 빌딩 꼭대기에 올라가 보는 거요', age: '팔 길이만큼 나이도 많아요 ㅎㅎ' },
+  flume: { hi: ['후룸라이드 개장했어요! 💦', '물 튀기는 거 좋아하면 저랑 얘기해요!'],
+    me: '통나무 배 타고 물길 도는 후룸라이드예요. 젖을 각오 하세요!', food: '여름엔 무조건 빙수죠 🍧', hobby: '물보라 크게 만들기 연습이요', dream: '세상에서 제일 높은 낙차 만들기!', age: '개장한 지는 꽤 됐어요. 아직 쌩쌩해요' },
+  tank: { hi: ['탱크 배치 완료. 🪖', '말수는 적지만 대화는 받습니다.'],
+    me: '장갑 두꺼운 탱크입니다. 멀리 있는 적도 맞힙니다', food: '전투식량… 의외로 맛있습니다', hobby: '포신 닦기. 반짝여야 기분이 좋습니다', dream: '포탄 한 발 안 쏘는 평화로운 날', age: '군번은 기밀입니다' },
 };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const statusLine = t => t.type === 'taxi'
+  ? `지금 웨이브 ${S.wave}이고, 저는 요금 ${t.earned || 0} 벌었어요 🚕`
+  : `지금 웨이브 ${S.wave}! 저는 검은 차 ${t.kills}대 잡았어요 💪`;
+const TALK = [
+  { k: ['안녕', '하이', 'ㅎㅇ', '반가', 'hello', 'hi'], r: () => pick(['안녕하세요! 😊', '반가워요! 오늘 기분 어때요?', '네 안녕하세요~']) },
+  { k: ['누구', '이름', '소개'], r: t => PERSONA[t.type].me },
+  { k: ['배고', '밥', '먹', '간식', '음식'], r: t => PERSONA[t.type].food },
+  { k: ['취미', '좋아하는'], r: t => PERSONA[t.type].hobby },
+  { k: ['꿈'], r: t => PERSONA[t.type].dream },
+  { k: ['몇살', '나이'], r: t => PERSONA[t.type].age },
+  { k: ['고마', '감사', '땡큐'], r: () => pick(['에이 뭘요 ㅎㅎ', '천만에요! 계속 지켜 드릴게요']) },
+  { k: ['잘했', '최고', '멋져', '짱', '대단', '잘한다'], r: () => pick(['헤헤 칭찬 들으니까 힘이 나요 😆', '더 열심히 할게요!']) },
+  { k: ['피곤', '졸려', '잠와', '자고'], r: () => pick(['저도 엔진이 좀 뜨겁네요… 같이 쉬어요 😴', '조금만 버티면 쉴 수 있어요!']) },
+  { k: ['심심'], r: () => pick(['저랑 수다 떨면 안 심심하죠 ㅋㅋ', '심심하면 아무 얘기나 해 봐요!']) },
+  { k: ['날씨', '덥', '춥'], r: () => pick(['오늘 협곡에 바람이 꽤 불어요 🍃', '엔진 과열 안 되게 조심해야겠어요']) },
+  { k: ['적', '웨이브', '검은', '싸움', '전투', '몇대', '잡았'], r: t => statusLine(t) },
+  { k: ['ㅋㅋ', 'ㅎㅎ', '웃겨'], r: () => pick(['ㅋㅋㅋ 저도 웃겨요', '😂😂']) },
+  { k: ['사랑해', '너좋아해', '네가좋아', '너가좋아'], r: () => pick(['어머… 저도요 💛', '부끄럽게 왜 그래요 ㅎㅎ']) },
+  { k: ['기분', '어때', '잘지내', '괜찮'], r: () => pick(['기름 꽉 차서 기분 최고예요!', '나쁘지 않아요. 당신은요?']) },
+];
+const FALLBACK = ['오 그렇구나!', '진짜요? 더 얘기해 줘요', '음… 그건 잘 모르겠어요 😅', '그 얘기 재밌네요 ㅎㅎ', '헉 그래요?'];
+const FOLLOW = ['근데 좋아하는 음식 뭐예요?', '요즘 뭐가 제일 재밌어요?', '주말엔 보통 뭐 해요?', '혹시 저 말고 좋아하는 차 있어요? 🤔'];
+// 퀴즈 트리거: 차량마다 무작위로 하나씩 숨겨 둡니다. 단어일 수도, 질문일 수도 있습니다.
+const TRIGGERS = [
+  { label: '피자', re: /피자/, hint: '요즘 이상하게 동그랗고 치즈 쭉 늘어나는 음식이 땡겨요 🍕' },
+  { label: '노래', re: /노래|음악/, hint: '흥얼흥얼~ 요즘 귀에 맴도는 게 있는데… 🎵' },
+  { label: '우산', re: /우산|비와|비가|비오/, hint: '하늘이 꾸물꾸물하네요. 뭐 챙겨야 하지 않나? ☔' },
+  { label: '강아지', re: /강아지|댕댕|멍멍/, hint: '꼬리 살랑살랑 흔드는 동물 진짜 좋아해요 🐾' },
+  { label: '여행', re: /여행/, hint: '전투 끝나면 어디 멀리 훌쩍 떠나고 싶다… ✈️' },
+  { label: '생일', re: /생일/, hint: '케이크에 초 꽂는 날 얘기 나오면 신나는데 🎂' },
+  { label: '바다', re: /바다/, hint: '파도 소리 듣고 싶네요. 짠 내 나는 그곳… 🌊' },
+  { label: '커피', re: /커피|아메리카노|라떼/, hint: '졸릴 땐 역시 쓴 그거 한 잔이죠 ☕' },
+  { label: '뭐 해?', re: /뭐해|뭐하/, hint: '제가 지금 뭐 하는지 안 궁금해요? 👀' },
+  { label: '무슨 색 좋아해?', re: /색깔|무슨색|좋아하는색/, hint: '색깔 얘기 나오면 저 할 말 많은데… 🎨' },
+  { label: '힘 세?', re: /힘세|강해|얼마나세|세냐|세\?/, hint: '제가 얼마나 센지 누가 물어봐 주면 좋겠다 💪' },
+  { label: '언제 퇴근해?', re: /퇴근|언제끝/, hint: '퇴근 시간 물어봐 주는 사람 어디 없나… 🕕' },
+  { label: '무섭지 않아?', re: /무서|겁나|겁 나/, hint: '솔직히… 검은 차들 좀 무섭긴 해요. 물어봐 주면 털어놓을게요' },
+  { label: '친구 있어?', re: /친구/, hint: '여기 다른 차들이랑 친해지고 싶은데… 🚗🚙' },
+];
+const SUGGEST = ['안녕?', '넌 누구야?', '뭐 해?', '배고파', '심심해', '몇 살이야?', '꿈이 뭐야?', '적 몇 대 잡았어?', '좋아하는 색깔은?', '피자 좋아해?', '커피 마실래?', '여행 가고 싶다', '강아지 좋아해?', '노래 추천해 줘', '바다 보고 싶다', '친구 있어?', '무섭지 않아?', '언제 퇴근해?', '오늘 내 생일이야', '우산 챙겼어?', '힘 세?', '고마워', '최고야!', '피곤하다'];
+const rollTrigger = () => pick(TRIGGERS);
 let quizDeck = [];
 function drawQuiz() {
   if (!quizDeck.length) quizDeck = QUIZ.map((_, i) => i).sort(() => Math.random() - .5);
@@ -938,113 +1017,178 @@ function ding() {
     [[880, 0], [1320, .09]].forEach(([f, d]) => {
       const o = audio.createOscillator(), g = audio.createGain();
       o.type = 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0, now + d); g.gain.linearRampToValueAtTime(.12, now + d + .01); g.gain.exponentialRampToValueAtTime(.001, now + d + .22);
+      g.gain.setValueAtTime(0, now + d); g.gain.linearRampToValueAtTime(.1, now + d + .01); g.gain.exponentialRampToValueAtTime(.001, now + d + .22);
       o.connect(g).connect(audio.destination); o.start(now + d); o.stop(now + d + .25);
     });
   } catch (e) { /* sound is optional */ }
 }
 
-const chatEl = $('chat'), chatBody = $('chatBody'), chatReplies = $('chatReplies');
-const chatQueue = []; let chat = null, lastSender = null;
+const chatEl = $('chat'), chatBody = $('chatBody'), chatReplies = $('chatReplies'), chatInput = $('chatInput'), chatSuggest = $('chatSuggest');
+let chatT = null;
 const clock = () => new Date().toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const scrollDown = () => { chatBody.scrollTop = chatBody.scrollHeight; };
 function avatarCanvas(type, size) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const g = c.getContext('2d'), s = size / 60; g.setTransform(s, 0, 0, s, 0, 0); drawTower(g, type, 30, 30, 1, -.7);
   return c;
 }
-const wait = ms => new Promise(r => setTimeout(r, ms));
-const scrollDown = () => { chatBody.scrollTop = chatBody.scrollHeight; };
 
-function openChat(t) { chatQueue.push(t); if (!chat) nextChat(); }
-function closeChat() { if (chat) chat.closed = true; chatQueue.length = 0; chat = null; chatEl.hidden = true; chatReplies.innerHTML = ''; }
-
-async function say(tok, html, cls = '') {
-  const t = tok.t;
-  const typing = document.createElement('div'); typing.className = 'row-them';
-  typing.innerHTML = `<div class="ava"></div><div class="stack"><div class="bubble typing"><i></i><i></i><i></i></div></div>`;
-  chatBody.appendChild(typing); scrollDown();
-  await wait(reduceMotion ? 150 : 550 + Math.random() * 350);
-  typing.remove();
-  if (tok.closed) return false;
-  const first = lastSender !== t; lastSender = t;
+function initChat(t) { t.log = []; t.unread = 0; t.trigger = rollTrigger(); t.misses = 0; t.cool = false; t.pending = null; t.busy = false; }
+function greet(t) {
+  for (const line of PERSONA[t.type].hi) logThem(t, line);
+  ding(); floatText(t.x, t.y - 30, '💬 새 메시지', '#fee500');
+}
+function msgEl(t, m, prev) {
+  if (m.who === 'me') {
+    const row = document.createElement('div'); row.className = 'row-me';
+    row.innerHTML = `<span class="msg-time">${m.time}</span><div class="bubble">${m.html}</div>`;
+    return row;
+  }
+  const first = !prev || prev.who !== 'them';
   const row = document.createElement('div'); row.className = 'row-them';
-  row.innerHTML = `<div class="ava"></div><div class="stack">${first ? `<div class="who">${TOWERS[t.type].name}</div>` : ''}<div class="line"><div class="bubble ${cls}">${html}</div><span class="msg-time">${clock()}</span></div></div>`;
+  row.innerHTML = `<div class="ava"></div><div class="stack">${first ? `<div class="who">${TOWERS[t.type].name}</div>` : ''}<div class="line"><div class="bubble ${m.cls || ''}">${m.html}</div><span class="msg-time">${m.time}</span></div></div>`;
   if (first) row.querySelector('.ava').appendChild(avatarCanvas(t.type, 76));
-  chatBody.appendChild(row); scrollDown();
-  return true;
+  return row;
 }
-function me(html) {
-  lastSender = 'me';
-  const row = document.createElement('div'); row.className = 'row-me';
-  row.innerHTML = `<span class="msg-time">${clock()}</span><div class="bubble">${html}</div>`;
-  chatBody.appendChild(row); scrollDown();
+function pushMsg(t, m) {
+  const prev = t.log[t.log.length - 1];
+  t.log.push(m);
+  if (chatT === t) { chatBody.appendChild(msgEl(t, m, prev)); scrollDown(); }
+  else if (m.who === 'them') t.unread++;
 }
-function choose(tok, items) {
-  return new Promise(resolve => {
-    tok.resolve = resolve;
-    chatReplies.innerHTML = '';
+const logThem = (t, html, cls = '') => pushMsg(t, { who: 'them', html, cls, time: clock() });
+const logMe = (t, html) => pushMsg(t, { who: 'me', html, time: clock() });
+async function say(t, html, cls) {
+  let typing = null;
+  if (chatT === t) {
+    typing = document.createElement('div'); typing.className = 'row-them';
+    typing.innerHTML = `<div class="ava"></div><div class="stack"><div class="bubble typing"><i></i><i></i><i></i></div></div>`;
+    chatBody.appendChild(typing); scrollDown();
+  }
+  await wait(reduceMotion ? 150 : 500 + Math.random() * 400);
+  if (typing) typing.remove();
+  if (!S.towers.includes(t)) return;
+  logThem(t, html, cls);
+}
+
+function openChat(t) {
+  chatT = t; t.unread = 0;
+  const head = $('chatAvatar').getContext('2d'); head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76); head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawTower(head, t.type, 30, 30, 1, -.7);
+  $('chatName').textContent = TOWERS[t.type].name;
+  chatBody.innerHTML = `<div class="chat-day">${new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}</div>`;
+  t.log.forEach((m, i) => chatBody.appendChild(msgEl(t, m, t.log[i - 1])));
+  chatEl.hidden = false; scrollDown();
+  refreshComposer();
+  if (matchMedia('(pointer: fine)').matches) chatInput.focus({ preventScroll: true });
+}
+function closeChat() { chatT = null; chatEl.hidden = true; }
+
+function refreshComposer() {
+  const t = chatT; if (!t) return;
+  chatReplies.innerHTML = '';
+  const p = t.pending;
+  if (p && !t.busy) {
+    const items = p.kind === 'quiz'
+      ? p.q.options.map(o => ({ label: o }))
+      : [
+        { key: 'gold', icon: '💰', label: `금화 +${p.gold}`, sub: '바로 받아서 차량을 더 세워요' },
+        { key: 'slow', icon: '🐢', label: '적 속도 20% 감소', sub: '전투 중 30초 동안 모든 적이 느려져요' },
+        { key: 'buff', icon: t.type === 'taxi' ? '🧾' : '💥', label: t.type === 'taxi' ? '이 택시 요금 +25%' : `${TOWERS[t.type].name} 공격력 +25%`, sub: '이 차량에게 영구히 적용돼요' },
+      ];
     items.forEach((it, i) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
-      b.innerHTML = it.icon ? `<span class="ic" aria-hidden="true">${it.icon}</span><span><span class="t">${it.label}</span><span class="s">${it.sub}</span></span>` : `<span class="no">${i + 1}</span><span>${it.label}</span>`;
-      b.addEventListener('click', () => { chatReplies.innerHTML = ''; tok.resolve = null; resolve(it); });
+      b.innerHTML = it.icon ? `<span class="ic" aria-hidden="true">${it.icon}</span><span><span class="t">${it.label}</span><span class="s">${it.sub}</span></span>` : `<span class="no">${i + 1}</span><span>${esc(it.label)}</span>`;
+      b.addEventListener('click', () => onChip(t, it));
       chatReplies.appendChild(b);
     });
-    scrollDown();
-    chatReplies.querySelector('button').focus({ preventScroll: true });
-  });
-}
-
-async function nextChat() {
-  const t = chatQueue.shift();
-  if (!t) { chat = null; chatEl.hidden = true; return; }
-  if (!S.towers.includes(t)) return nextChat();
-  const tok = { t, closed: false }; chat = tok; lastSender = null;
-  const d = TOWERS[t.type];
-  const head = $('chatAvatar').getContext('2d'); head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76); head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawTower(head, t.type, 30, 30, 1, -.7);
-  $('chatName').textContent = d.name;
-  chatBody.innerHTML = `<div class="chat-day">${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</div>`;
-  chatReplies.innerHTML = '';
-  chatEl.hidden = false; ding();
-
-  for (const line of GREET[t.type]) if (!await say(tok, line)) return;
-  if (!await say(tok, '심심한데 퀴즈 하나 낼게요. 맞히면 선물 드려요 🎁')) return;
-  const q = drawQuiz();
-  if (!await say(tok, `<span class="q">Q. ${q.q}</span>`)) return;
-  const pick = await choose(tok, q.options.map(o => ({ label: o })));
-  if (!pick || tok.closed) return;
-  me(pick.label);
-  if (pick.label !== q.a) {
-    if (!await say(tok, `땡! 정답은 <b>${q.a}</b>였어요 😅`)) return;
-    if (!await say(tok, '다음에 또 문제 낼게요. 전투는 맡겨 주세요!')) return;
-  } else {
-    if (!await say(tok, '정답! 👏 선물 하나 골라 보세요.', 'gift')) return;
-    const gold = 40 + S.wave * 5;
-    const taxi = t.type === 'taxi';
-    const reward = await choose(tok, [
-      { key: 'gold', icon: '💰', label: `금화 +${gold}`, sub: '바로 받아서 차량을 더 세워요' },
-      { key: 'slow', icon: '🐢', label: '적 속도 20% 감소', sub: '전투 중 30초 동안 모든 적이 느려져요' },
-      { key: 'buff', icon: taxi ? '🧾' : '💥', label: taxi ? '이 택시 요금 +25%' : `${d.name} 공격력 +25%`, sub: '이 차량에게 영구히 적용돼요' },
-    ]);
-    if (!reward || tok.closed) return;
-    me(`${reward.icon} ${reward.label}`);
-    if (reward.key === 'gold') { S.gold += gold; floatText(t.x, t.y - 26, '+' + gold, '#e2b54a'); }
-    if (reward.key === 'slow') { S.slowAll = Math.max(S.slowAll, 0) + 30; }
-    if (reward.key === 'buff' && S.towers.includes(t)) { t.buff = (t.buff || 1) + .25; ring(t.x, t.y, 12, 40, '#fee500', .5); }
-    panelKey = '';
-    const thanks = { gold: `금화 ${gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: taxi ? '요금 할증 붙였어요! 더 벌어 올게요 🚕' : '힘이 솟네요! 더 세게 쏠게요 💪' }[reward.key];
-    if (!await say(tok, thanks)) return;
   }
-  await wait(1300);
-  if (tok.closed) return;
-  nextChat();
+  const locked = !!p;
+  chatInput.disabled = locked; $('chatSend').disabled = locked;
+  chatInput.placeholder = locked ? (p.kind === 'quiz' ? '보기 중에서 정답을 골라 주세요' : '선물을 하나 골라 주세요') : '메시지 입력';
+  chatSuggest.innerHTML = '';
+  if (!locked) {
+    const picks = SUGGEST.slice().sort(() => Math.random() - .5).slice(0, 3);
+    for (const s of picks) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; b.textContent = s;
+      b.addEventListener('click', () => send(s));
+      chatSuggest.appendChild(b);
+    }
+  }
+  scrollDown();
 }
+
+async function send(text) {
+  const t = chatT; text = (text || '').trim();
+  if (!t || !text || t.pending || t.busy) return;
+  chatInput.value = '';
+  logMe(t, esc(text));
+  t.busy = true; refreshComposer();
+  const norm = text.toLowerCase().replace(/\s+/g, '');
+  if (t.trigger && t.trigger.re.test(norm)) {
+    t.misses = 0;
+    await say(t, `어? 방금 "${esc(text)}"라고 했죠! 그 말 기다리고 있었어요 😆`);
+    await say(t, '갑자기 퀴즈 내고 싶어졌어요. 맞히면 선물 드려요 🎁', 'gift');
+    const q = drawQuiz(); t.trigger = null;
+    await say(t, `<span class="q">Q. ${q.q}</span>`);
+    t.pending = { kind: 'quiz', q };
+  } else if (/퀴즈|문제/.test(norm)) {
+    await say(t, t.cool ? '퀴즈는 다음 웨이브 막고 나서 또 낼게요! 그때까지 수다나 떨어요 ㅎㅎ' : '퀴즈요? 흠… 그냥은 안 내요 😏 저랑 수다 떨다 보면 갑자기 생각날지도?');
+  } else {
+    const hit = TALK.find(x => x.k.some(k => norm.includes(k.replace(/\s+/g, ''))));
+    await say(t, hit ? hit.r(t) : pick(FALLBACK));
+    if (!hit && Math.random() < .4) await say(t, pick(FOLLOW));
+    if (t.trigger && ++t.misses >= 3) { t.misses = 0; await say(t, t.trigger.hint); }
+  }
+  t.busy = false;
+  if (chatT === t) refreshComposer();
+}
+
+async function onChip(t, it) {
+  const p = t.pending; if (!p || t.busy) return;
+  t.pending = null; t.busy = true;
+  if (p.kind === 'quiz') {
+    logMe(t, esc(it.label)); refreshComposer();
+    if (it.label === p.q.a) {
+      await say(t, '정답! 👏 선물 하나 골라 보세요.', 'gift');
+      t.pending = { kind: 'reward', gold: 40 + S.wave * 5 };
+    } else {
+      await say(t, `땡! 정답은 <b>${esc(p.q.a)}</b>였어요 😅`);
+      await cooldown(t);
+    }
+  } else {
+    logMe(t, `${it.icon} ${it.label}`); refreshComposer();
+    if (it.key === 'gold') { S.gold += p.gold; floatText(t.x, t.y - 26, '+' + p.gold, '#e2b54a'); }
+    if (it.key === 'slow') S.slowAll = Math.max(S.slowAll, 0) + 30;
+    if (it.key === 'buff' && S.towers.includes(t)) { t.buff = (t.buff || 1) + .25; ring(t.x, t.y, 12, 40, '#fee500', .5); }
+    panelKey = '';
+    await say(t, { gold: `금화 ${p.gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: t.type === 'taxi' ? '요금 할증 붙였어요! 더 벌어 올게요 🚕' : '힘이 솟네요! 더 세게 쏠게요 💪' }[it.key]);
+    await cooldown(t);
+  }
+  t.busy = false;
+  if (chatT === t) refreshComposer();
+}
+async function cooldown(t) {
+  t.cool = true; t.trigger = null;
+  await say(t, '다음 웨이브 막고 나면 또 퀴즈 낼 수 있어요. 그때까지 수다나 떨어요 ㅎㅎ');
+}
+function onWaveCleared() {
+  for (const t of S.towers) if (t.cool) {
+    t.cool = false; t.trigger = rollTrigger(); t.misses = 0;
+    logThem(t, `웨이브 ${S.wave} 막았다! 🎉 또 얘기해요. 수다 떨다 보면 퀴즈가 생각날지도?`);
+  }
+}
+
 $('chatClose').addEventListener('click', closeChat);
+$('chatForm').addEventListener('submit', e => { e.preventDefault(); send(chatInput.value); });
+chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
 
 // ---------- loop ----------
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  if (!paused && !chat) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
+  if (!paused && !chatT) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
   render(); refreshUI();
   requestAnimationFrame(frame);
 }
