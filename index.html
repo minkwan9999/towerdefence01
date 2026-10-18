@@ -504,8 +504,8 @@ const sellRate = () => .5 + skillVal('sell') / 100;
 const ORDER = ['police', 'fire', 'dump', 'bumper', 'crane', 'flume', 'tank'];
 const ITEMS = {
   secret1: { name: '비행기', color: '#7fb2e5', desc: '길의 시작부터 끝까지 날아가며, 아래에 적이 있으면 폭탄을 떨어뜨립니다. 적을 만나도 멈추지 않습니다.' },
-  secret2: { name: '불', color: '#ff7a2f', place: true, desc: '길 한 칸에 불을 놓습니다. 지나가는 적은 불이 붙어 4초 동안 체력이 계속 줄어듭니다.' },
-  secret3: { name: '웅덩이', color: '#3f8fd0', place: true, desc: '길 한 칸에 웅덩이를 만듭니다. 지나가는 적은 3초 동안 40% 느려집니다.' },
+  secret2: { name: '불', color: '#ff7a2f', place: true, consumable: true, desc: '길 한 칸에 1분 동안 불을 놓습니다. 지나가는 적은 불이 붙어 4초 동안 체력이 계속 줄어듭니다. 놓을 때마다 호감도를 씁니다.' },
+  secret3: { name: '웅덩이', color: '#3f8fd0', place: true, consumable: true, desc: '길 한 칸에 1분 동안 웅덩이를 만듭니다. 지나가는 적은 3초 동안 40% 느려집니다. 놓을 때마다 호감도를 씁니다.' },
 };
 // 테스트용: 원래 값은 50. 테스트가 끝나면 50으로 되돌립니다.
 const ITEM_KEYS = Object.keys(ITEMS), ITEM_COST = 1;
@@ -1168,7 +1168,11 @@ function render() {
     if (!t && canPlace(hover.c, hover.r)) { ctx.fillStyle = 'rgba(235,230,211,.06)'; ctx.fillRect(hover.c * T, hover.r * T, T, T); }
   }
   for (const o of S.obst.values()) drawObstacle(ctx, o);
-  for (const h of S.hazards) { ctx.save(); ctx.translate(h.x, h.y); ctx.scale(.85, .85); drawWeapon(ctx, h.type, 0, null, true); ctx.restore(); }
+  for (const h of S.hazards) {
+    ctx.save(); ctx.globalAlpha = Math.min(1, h.life / 3); ctx.translate(h.x, h.y); ctx.scale(.85, .85); drawWeapon(ctx, h.type, 0, null, true); ctx.restore();
+    ctx.strokeStyle = 'rgba(235,230,211,.55)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(h.x, h.y, 24, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * h.life / HAZARD_LIFE); ctx.stroke();
+    ctx.font = '700 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctx.strokeText(Math.ceil(h.life) + 's', h.x, h.y + 27); ctx.fillStyle = '#ebe6d3'; ctx.fillText(Math.ceil(h.life) + 's', h.x, h.y + 27);
+  }
   if (obsView && S.obst.has(obsView)) { const o = S.obst.get(obsView); ctx.strokeStyle = '#c2a6ff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); rr(ctx, o.c * T + 3, o.r * T + 3, T - 6, T - 6, 8); ctx.stroke(); ctx.setLineDash([]); }
   for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
 
@@ -1314,7 +1318,7 @@ function refreshUI() {
   if (itemPlace) {
     const it = ITEMS[itemPlace];
     key = 'p' + itemPlace;
-    html = `<h3>${it.name} <span class="lv">아이템</span></h3><p>${it.desc}</p><p>적이 지나가는 <b>길 칸</b>을 눌러 놓으세요. 한 판에 한 번만 쓸 수 있습니다.</p>
+    html = `<h3>${it.name} <span class="lv">아이템</span></h3><p>${it.desc}</p><p>적이 지나가는 <b>길 칸</b>을 눌러 놓으세요. 놓을 때 호감도 ${ITEM_COST}를 쓰고, 1분 동안 유지됩니다.</p>
       <div class="row"><button class="btn grow" type="button" data-act="cancel">취소</button></div>`;
   } else if (obsView && S.obst.has(obsView)) {
     const o = S.obst.get(obsView), od = OBST_TYPES[o.type], can = prog.ap >= CLEAR_COST;
@@ -1976,11 +1980,20 @@ $('chatForm').addEventListener('submit', e => { e.preventDefault(); send(chatInp
 chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
 
 // ---------- affection items ----------
-// 비행기·불·웅덩이: 대화 상대의 호감도 50으로 사는 아이템. 한 번 사면 계속 보유하고, 한 판에 한 번씩 쓸 수 있습니다.
+// 비행기: 호감도로 한 번 사면 계속 보유하고, 한 판에 한 번씩 쓸 수 있습니다.
+// 불·웅덩이: 놓을 때마다 지금 대화 상대의 호감도를 쓰고, 1분 동안 유지됩니다. 호감도가 남아 있으면 몇 번이든 쓸 수 있습니다.
+const HAZARD_LIFE = 60;
 let itemPlace = null;
 const hazardAt = (c, r) => S.hazards.some(h => h.c === c && h.r === r);
+const canAfford = () => { const P = curP(); return !!P && affOf(P) >= ITEM_COST; };
 function useItem(k) {
-  if (inLobby || S.over || !prog.items[k] || S.itemUsed[k]) return;
+  if (inLobby || S.over) return;
+  if (ITEMS[k].consumable) {
+    if (itemPlace === k) itemPlace = null;
+    else if (canAfford()) { itemPlace = k; build = null; sel = null; lockView = null; obsView = null; }
+    panelKey = ''; return;
+  }
+  if (!prog.items[k] || S.itemUsed[k]) return;
   if (k === 'secret1') {
     S.itemUsed[k] = true;
     S.planes.push({ d: 0, cd: 0, x: PTS[0].x, y: PTS[0].y, ang: 0 });
@@ -1990,10 +2003,12 @@ function useItem(k) {
 }
 function placeHazard(c, r) {
   if (!itemPlace || !PATH.has(c + ',' + r) || hazardAt(c, r)) return false;
+  const P = curP();
+  if (!P || affOf(P) < ITEM_COST) { itemPlace = null; panelKey = ''; return false; }
+  prog.aff[P.id] = Math.round((affOf(P) - ITEM_COST) * 10) / 10; saveProg(); updateAffUI();
   const x = (c + .5) * T, y = (r + .5) * T;
-  S.hazards.push({ type: itemPlace, c, r, x, y });
-  S.itemUsed[itemPlace] = true;
-  ring(x, y, 6, 36, ITEMS[itemPlace].color, .5);
+  S.hazards.push({ type: itemPlace, c, r, x, y, life: HAZARD_LIFE });
+  ring(x, y, 6, 36, ITEMS[itemPlace].color, .5); floatText(x, y - 24, '-💗' + ITEM_COST, '#ff8fb3');
   itemPlace = null; panelKey = '';
   return true;
 }
@@ -2007,6 +2022,8 @@ function buyItem(k) {
   if (inLobby) renderLobby();
 }
 function updateHazards(dt) {
+  for (const h of S.hazards) h.life -= dt;
+  S.hazards = S.hazards.filter(h => h.life > 0);
   for (const e of S.enemies) {
     if (!e.alive) continue;
     const ec = Math.floor(e.x / T), er = Math.floor(e.y / T);
@@ -2042,14 +2059,19 @@ function drawItemIcon(cvs, k) {
 let itemsKey = '';
 function renderItemsBar() {
   const P = curP(), aff = P ? Math.floor(affOf(P)) : 0;
-  const key = ITEM_KEYS.map(k => [!!prog.items[k], !!S.itemUsed[k], itemPlace === k]).join() + '|' + aff + (P ? P.id : '') + S.over;
+  const key = ITEM_KEYS.map(k => [!!prog.items[k], !!S.itemUsed[k], itemPlace === k, S.hazards.filter(h => h.type === k).length]).join() + '|' + aff + (P ? P.id : '') + S.over;
   if (key === itemsKey) return; itemsKey = key;
   const bar = $('itemsBar'); bar.innerHTML = '';
   for (const k of ITEM_KEYS) {
     const it = ITEMS[k], own = !!prog.items[k], used = !!S.itemUsed[k], placing = itemPlace === k;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'icard' + (placing ? ' on' : '') + (own ? '' : ' locked'); b.style.setProperty('--ic', it.color);
     let st, act;
-    if (!own) { st = `💗 ${ITEM_COST}로 구매`; act = 'buy'; b.disabled = !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
+    const nOn = S.hazards.filter(h => h.type === k).length;
+    if (it.consumable) {
+      if (placing) { st = '길 칸을 고르세요 · 취소'; act = 'use'; }
+      else { st = `💗 ${ITEM_COST}씩 · 1분` + (nOn ? ` · ${nOn}개 놓임` : ''); act = 'use'; b.disabled = S.over || !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
+      b.classList.remove('locked');
+    } else if (!own) { st = `💗 ${ITEM_COST}로 구매`; act = 'buy'; b.disabled = !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
     else if (used) { st = '이번 판 사용함'; act = ''; b.disabled = true; }
     else if (placing) { st = '길 칸을 고르세요 · 취소'; act = 'use'; }
     else { st = it.place ? '눌러서 길에 놓기' : '눌러서 출격'; act = 'use'; b.disabled = S.over; }
@@ -2072,7 +2094,7 @@ function renderAffShop() {
     const it = ITEMS[k], own = !!prog.items[k], can = P && aff >= ITEM_COST;
     return `<div class="acard" style="--ic:${it.color}"><canvas width="88" height="88" data-icon="${k}" aria-hidden="true"></canvas><div>
       <div class="nm">${it.name}</div><div class="ds">${it.desc}</div>
-      ${own ? '<span class="owned">보유 · 한 판에 한 번</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-buyitem="${k}" ${can ? '' : 'disabled'}>💗 ${ITEM_COST}로 구매</button>`}
+      ${it.consumable ? `<span class="owned">게임 중 놓을 때마다 💗 ${ITEM_COST} · 1분 지속</span>` : own ? '<span class="owned">보유 · 한 판에 한 번</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-buyitem="${k}" ${can ? '' : 'disabled'}>💗 ${ITEM_COST}로 구매</button>`}
     </div></div>`;
   }).join('');
   for (const c of $('affShop').querySelectorAll('[data-icon]')) drawItemIcon(c, c.dataset.icon);
