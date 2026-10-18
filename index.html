@@ -507,7 +507,8 @@ const ITEMS = {
   secret2: { name: '불', color: '#ff7a2f', place: true, desc: '길 한 칸에 불을 놓습니다. 지나가는 적은 불이 붙어 4초 동안 체력이 계속 줄어듭니다.' },
   secret3: { name: '웅덩이', color: '#3f8fd0', place: true, desc: '길 한 칸에 웅덩이를 만듭니다. 지나가는 적은 3초 동안 40% 느려집니다.' },
 };
-const ITEM_KEYS = Object.keys(ITEMS), ITEM_COST = 50;
+// 테스트용: 원래 값은 50. 테스트가 끝나면 50으로 되돌립니다.
+const ITEM_KEYS = Object.keys(ITEMS), ITEM_COST = 1;
 // 적군은 아군과 똑같은 차량을 검은색으로 칠한 것입니다.
 const ENEMIES = {
   grunt:  { name: '검은 택시',     car: 'taxi',   hp: 42,   speed: 1.15, reward: 6,   lives: 1,  scale: .9 },
@@ -693,7 +694,8 @@ function drawVehicle(g, type, off) {
 }
 // towers are weapons drawn top-down; rotating ones face +x
 // 무기 색 바꾸기: 패시브 상점에서 200 AP로 사면 보유 무기 하나에 일곱 색 중 하나를 칠할 수 있습니다.
-const PAINT_COST = 200;
+// 테스트용: 원래 값은 200. 테스트가 끝나면 200으로 되돌립니다.
+const PAINT_COST = 1;
 const PAINTS = [
   { id: 'red',    name: '빨강', hex: '#e5484d' },
   { id: 'orange', name: '주황', hex: '#f2873a' },
@@ -1415,7 +1417,7 @@ function paintCard() {
     body = `<div class="ds"><b>색을 바꿀 무기를 하나 고르세요.</b> 고른 무기는 무기고의 "보유" 옆에 색 버튼이 생깁니다.</div>
       <div class="pick">${free.map(t => `<button class="btn sm" type="button" data-paintpick="${t}">${TOWERS[t].name}</button>`).join('') || '<span class="owned">고를 수 있는 무기가 없습니다</span>'}</div>`;
   } else {
-    body = `<div class="ds">200 AP로 사면 보유한 무기 하나를 골라 빨·주·노·초·파·남·보 중 원하는 색으로 칠할 수 있습니다. 여러 번 사서 무기마다 열 수 있습니다.${slots.length ? `<br>색을 바꿀 수 있는 무기: <b>${slots.map(t => TOWERS[t].name).join(', ')}</b>` : ''}</div>
+    body = `<div class="ds">${PAINT_COST} AP로 사면 보유한 무기 하나를 골라 빨·주·노·초·파·남·보 중 원하는 색으로 칠할 수 있습니다. 여러 번 사서 무기마다 열 수 있습니다.${slots.length ? `<br>색을 바꿀 수 있는 무기: <b>${slots.map(t => TOWERS[t].name).join(', ')}</b>` : ''}</div>
       ${free.length ? `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-paintbuy ${can ? '' : 'disabled'}>${PAINT_COST} AP로 구매</button>` : '<span class="owned">보유한 무기 모두 열림</span>'}`;
   }
   return `<div class="scard paint"><div class="ic" aria-hidden="true">🎨</div><div>
