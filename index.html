@@ -273,7 +273,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
       <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
       <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
       <div class="keys">
-        <kbd>1</kbd>–<kbd>8</kbd> 차량 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
+        <kbd>1</kbd>–<kbd>8</kbd> 차량 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>C</kbd> 대화 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
       </div>
     </aside>
   </div>
@@ -381,7 +381,7 @@ function stats(t) {
   };
 }
 const upCost = t => Math.round(TOWERS[t.type].cost * .75 * t.lv);
-const refund = t => Math.floor(t.invested * .7);
+const refund = t => Math.floor(t.invested * .5);
 
 function buildWave(w) {
   const list = [], n = 6 + Math.floor(w * 1.8);
@@ -907,21 +907,21 @@ function refreshUI() {
   } else if (sel) {
     const st = stats(sel), d = TOWERS[sel.type], max = sel.lv >= 3, c = max ? 0 : upCost(sel);
     const nx = max ? null : stats({ type: sel.type, lv: sel.lv + 1, buff: sel.buff });
-    key = 's' + S.towers.indexOf(sel) + (sel.buff || 1) + '|' + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c);
+    key = 's' + S.towers.indexOf(sel) + (sel.buff || 1) + '|' + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c) + '|' + (sel.unread || 0);
     const up = (a, b) => nx ? ` <span class="up">→ ${b}</span>` : '';
     html = `<h3>${d.name} <span class="lv">Lv.${sel.lv}${max ? ' · 최대' : ''}</span></h3>
       <dl class="kv">${st.income ? `<dt>웨이브당 요금</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>번 요금</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
       ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
-      <dt>처치</dt><dd>${sel.kills}</dd>`}${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
-      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell">판매 <span class="mono">+${refund(sel)}</span></button></div>
-      <button class="btn" type="button" data-act="chat">📻 ${TOWERS[sel.type].name}와 무전하기</button>`;
+      <dt>처치</dt><dd>${sel.kills}</dd>`}<dt>들인 금화</dt><dd>${sel.invested}</dd>${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
+      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="설치비와 강화비 합계의 50%를 돌려받습니다">판매 <span class="mono">+${refund(sel)}</span></button></div>
+      <button class="btn" type="button" data-act="chat">📻 대화하기${sel.unread ? ` <span class="mono">(${sel.unread})</span>` : ''}</button>`;
   } else {
     const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
     const counts = {}; for (const q of buildWave(nextW)) counts[q.type] = (counts[q.type] || 0) + 1;
     key = 'i' + nextW + S.waveActive;
     html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
-      <p>적군은 우리와 똑같은 차량을 검게 칠한 것입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 차를 누르면 대화하고, 강화하거나 판매할 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 차가 퀴즈를 냅니다.</p>`;
+      <p>적군은 우리와 똑같은 차량을 검게 칠한 것입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 차를 누르면 강화, 판매(들인 금화의 50%), 대화하기를 고를 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 차가 퀴즈를 냅니다.</p>`;
   }
   if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
 }
@@ -1001,11 +1001,10 @@ cv.addEventListener('click', e => {
   const t = occ.get(h.c + ',' + h.r);
   if (build) {
     if (canPlace(h.c, h.r)) { const type = build; if (place(type, h.c, h.r)) { if (!e.shiftKey) build = null; greet(occ.get(h.c + ',' + h.r)); } }
-    else if (t) { sel = t; build = null; openChat(t); }
+    else if (t) { sel = t; build = null; }
     return;
   }
   sel = t || null;
-  if (t) openChat(t);
 });
 cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel = null; });
 window.addEventListener('keydown', e => {
@@ -1023,6 +1022,7 @@ window.addEventListener('keydown', e => {
   else if (e.key === 'Escape') { build = null; sel = null; }
   else if (e.code === 'Space') { e.preventDefault(); startWave(); }
   else if (e.key === 'u' || e.key === 'U') upgrade(sel);
+  else if ((e.key === 'c' || e.key === 'C') && sel) openChat(sel);
   else if (e.key === 'x' || e.key === 'X' || e.key === 'Delete') sell(sel);
   else if (e.key === 'p' || e.key === 'P') paused = !paused;
   else if (e.key === 'f' || e.key === 'F') speed = speed === 1 ? 2 : speed === 2 ? 3 : 1;
