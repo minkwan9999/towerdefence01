@@ -204,6 +204,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .dname { font-family: var(--f-display); font-size: 24px; line-height: 1; color: var(--dc); }
 .dlv { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .dcard .kv { font-size: 12.5px; }
+.skills { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 8px; }
+.scard { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.scard .ic { align-self: start; font-size: 24px; line-height: 36px; text-align: center; background: var(--panel-2); border-radius: 6px; }
+.scard .nm { font-weight: 700; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.pips { display: inline-flex; gap: 3px; }
+.pips i { width: 10px; height: 6px; border-radius: 2px; background: var(--line); }
+.pips i.on { background: #c2a6ff; }
+.scard .ds { font-size: 12px; color: var(--muted); line-height: 1.4; margin: 3px 0 8px; }
+.scard .ds b { color: var(--text); font-weight: 500; }
+.passives { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+.passives b { color: #c2a6ff; font-weight: 500; }
 .garage { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
 .gcard { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
 .gcard canvas { width: 44px; height: 44px; }
@@ -239,9 +250,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   </header>
 
   <section class="lobby game-lobby" id="lobby" hidden>
-    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 차고에서 새 차량을 해제합니다. 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
+    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나 차고에서 새 차량을 해제합니다. 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
     <div class="section-label">난이도 선택</div>
     <div class="diffs" id="diffs"></div>
+    <div class="section-label">패시브 상점 · 업적 포인트로 영구 강화</div>
+    <div class="skills" id="skills"></div>
     <div class="section-label">차고 · 차량 해제</div>
     <div class="garage" id="garage"></div>
     <p class="fine">기록과 업적 포인트는 이 브라우저에 저장됩니다. 시간은 게임 속도와 상관없이 게임 안의 시간으로 잽니다.</p>
@@ -352,11 +365,23 @@ function loadProg() {
   let p = null;
   try { p = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
   p = p && typeof p === 'object' ? p : {};
-  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {} };
+  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {} };
 }
 const prog = loadProg();
 function saveProg() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(prog)); } catch (e) { /* progress stays for this visit only */ } }
 const isUnlocked = type => prog.unlocked.includes(type);
+// 패시브 스킬: 업적 포인트로 단계를 올리면 모든 판에 계속 적용됩니다. 단계 n으로 올리는 비용은 base × n.
+const SKILLS = [
+  { id: 'dmg',  icon: '💥', name: '공격력 증가',     per: 5,  max: 5, base: 6, fmt: v => `모든 차량 공격력 +${v}%` },
+  { id: 'aspd', icon: '⚡', name: '공격 속도 증가',  per: 5,  max: 5, base: 6, fmt: v => `모든 차량 공격 속도 +${v}%` },
+  { id: 'def',  icon: '🛡️', name: '성문 방어력 증가', per: 2,  max: 5, base: 4, fmt: v => `성문 내구도 +${v} (시작 20)` },
+  { id: 'slow', icon: '🐢', name: '적 속도 감소',    per: 3,  max: 5, base: 5, fmt: v => `모든 적 이동 속도 -${v}%` },
+  { id: 'sell', icon: '♻️', name: '판매 회수율 증가', per: 5,  max: 5, base: 3, fmt: v => `판매 시 돌려받는 비율 +${v}%p (기본 50%)` },
+  { id: 'gold', icon: '💰', name: '시작 금화 증가',  per: 20, max: 5, base: 4, fmt: v => `시작 금화 +${v} (기본 180)` },
+];
+const skillLv = id => Math.min(SKILLS.find(k => k.id === id).max, prog.skills[id] | 0);
+const skillVal = id => skillLv(id) * SKILLS.find(k => k.id === id).per;
+const sellRate = () => .5 + skillVal('sell') / 100;
 const ORDER = ['police', 'fire', 'dump', 'bumper', 'taxi', 'crane', 'flume', 'tank'];
 // 적군은 아군과 똑같은 차량을 검은색으로 칠한 것입니다.
 const ENEMIES = {
@@ -370,9 +395,9 @@ const ER = 16;
 function stats(t) {
   const d = TOWERS[t.type], k = t.lv - 1;
   return {
-    dmg: d.dmg * Math.pow(1.6, k) * (t.buff || 1),
+    dmg: d.dmg * Math.pow(1.6, k) * (t.buff || 1) * (1 + skillVal('dmg') / 100),
     range: d.range ? (d.range + .35 * k) * T : 0,
-    rate: d.rate * Math.pow(.88, k),
+    rate: d.rate * Math.pow(.88, k) / (1 + skillVal('aspd') / 100),
     slow: d.slow ? Math.min(.7, d.slow + .08 * k) : 0,
     slowDur: d.slowDur || 0,
     splash: d.splash ? (d.splash + .15 * k) * T : 0,
@@ -381,7 +406,7 @@ function stats(t) {
   };
 }
 const upCost = t => Math.round(TOWERS[t.type].cost * .75 * t.lv);
-const refund = t => Math.floor(t.invested * .5);
+const refund = t => Math.floor(t.invested * sellRate());
 
 function buildWave(w) {
   const list = [], n = 6 + Math.floor(w * 1.8);
@@ -587,7 +612,7 @@ function drawEnemy(g, e) {
 // ---------- state ----------
 let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true;
 function reset(diff) {
-  S = { diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180, lives: 20, wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
+  S = { diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
   occ = new Map(); build = null; sel = null; paused = false;
   document.getElementById('overlay').hidden = true;
   if (typeof closeChat === 'function') closeChat();
@@ -682,7 +707,7 @@ function fire(t, e, st) {
   }
 }
 
-const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1) * dmult(S.diff);
+const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1) * dmult(S.diff) * (1 - skillVal('slow') / 100);
 function update(dt) {
   for (const f of S.fx) { f.life -= dt; if (f.k === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } if (f.k === 'text') f.y -= 26 * dt; }
   S.fx = S.fx.filter(f => f.life > 0);
@@ -913,7 +938,7 @@ function refreshUI() {
       <dl class="kv">${st.income ? `<dt>웨이브당 요금</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>번 요금</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
       ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
       <dt>처치</dt><dd>${sel.kills}</dd>`}<dt>들인 금화</dt><dd>${sel.invested}</dd>${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
-      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="설치비와 강화비 합계의 50%를 돌려받습니다">판매 <span class="mono">+${refund(sel)}</span></button></div>
+      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="설치비와 강화비 합계의 ${Math.round(sellRate() * 100)}%를 돌려받습니다">판매 <span class="mono">+${refund(sel)}</span></button></div>
       <button class="btn" type="button" data-act="chat">📻 대화하기${sel.unread ? ` <span class="mono">(${sel.unread})</span>` : ''}</button>`;
   } else {
     const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
@@ -921,7 +946,7 @@ function refreshUI() {
     key = 'i' + nextW + S.waveActive;
     html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
-      <p>적군은 우리와 똑같은 차량을 검게 칠한 것입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 차를 누르면 강화, 판매(들인 금화의 50%), 대화하기를 고를 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 차가 퀴즈를 냅니다.</p>`;
+      <p>적군은 우리와 똑같은 차량을 검게 칠한 것입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 차를 누르면 강화, 판매(들인 금화의 ${Math.round(sellRate() * 100)}%), 대화하기를 고를 수 있습니다. 수다를 떨다 숨은 말을 꺼내면 차가 퀴즈를 냅니다.</p>${passiveSummary()}`;
   }
   if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
 }
@@ -959,7 +984,22 @@ function startGame(i) {
   document.querySelector('.app').classList.remove('in-lobby');
   $('lobby').hidden = true;
 }
+function passiveSummary() {
+  const on = SKILLS.filter(k => skillLv(k.id) > 0);
+  return on.length ? `<p class="passives">패시브: ${on.map(k => `<b>${k.fmt(skillVal(k.id))}</b>`).join(' · ')}</p>` : '';
+}
+function renderSkills() {
+  $('skills').innerHTML = SKILLS.map(k => {
+    const lv = skillLv(k.id), maxed = lv >= k.max, cost = k.base * (lv + 1), can = !maxed && prog.ap >= cost;
+    return `<div class="scard"><div class="ic" aria-hidden="true">${k.icon}</div><div>
+      <div class="nm"><span>${k.name}</span><span class="pips" aria-label="${lv}/${k.max}단계">${Array.from({ length: k.max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</span></div>
+      <div class="ds">${lv ? `지금: <b>${k.fmt(lv * k.per)}</b>` : '아직 배우지 않음'}${maxed ? '' : `<br>다음 단계: ${k.fmt((lv + 1) * k.per)}`}</div>
+      ${maxed ? '<span class="owned">최대 단계</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-skill="${k.id}" ${can ? '' : 'disabled'}>${cost} AP로 ${lv + 1}단계</button>`}
+    </div></div>`;
+  }).join('');
+}
 function renderLobby() {
+  renderSkills();
   $('diffs').innerHTML = DIFFS.map((D, i) => {
     const r = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
     return `<div class="dcard" style="--dc:${D.color}">
@@ -979,6 +1019,12 @@ function renderLobby() {
   }
 }
 $('diffs').addEventListener('click', e => { const b = e.target.closest('[data-diff]'); if (b) startGame(+b.dataset.diff); });
+$('skills').addEventListener('click', e => {
+  const b = e.target.closest('[data-skill]'); if (!b) return;
+  const k = SKILLS.find(x => x.id === b.dataset.skill), lv = skillLv(k.id), cost = k.base * (lv + 1);
+  if (lv >= k.max || prog.ap < cost) return;
+  prog.ap -= cost; prog.skills[k.id] = lv + 1; saveProg(); renderLobby();
+});
 $('garage').addEventListener('click', e => {
   const b = e.target.closest('[data-unlock]'); if (!b) return;
   const type = b.dataset.unlock, cost = TOWERS[type].ap;
