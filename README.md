@@ -5,6 +5,7 @@
 ## 플레이
 
 - 배포 주소: https://minkwan9999.github.io/towerdefence01/
+- 배포 상태: [Actions 탭](https://github.com/minkwan9999/towerdefence01/actions)의 `pages build and deployment`. `main`에 푸시하면 자동으로 다시 배포됩니다.
 - 로컬: `index.html`을 브라우저로 열면 바로 실행됩니다. 빌드 과정이 없습니다.
 
 ## 조작
