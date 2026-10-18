@@ -610,7 +610,7 @@ function drawEnemy(g, e) {
 }
 
 // ---------- state ----------
-let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true;
+let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true, lockView = null;
 function reset(diff) {
   S = { diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
   occ = new Map(); build = null; sel = null; paused = false;
@@ -886,7 +886,18 @@ for (const [i, type] of ORDER.entries()) {
   shop.appendChild(b);
   b.dataset.cost = d.cost;
 }
-function toggleBuild(type) { if (S.over || !isUnlocked(type)) return; build = build === type ? null : type; sel = null; }
+function toggleBuild(type) {
+  if (S.over) return;
+  sel = null;
+  if (!isUnlocked(type)) { build = null; lockView = lockView === type ? null : type; return; }
+  lockView = null; build = build === type ? null : type;
+}
+function unlockVehicle(type) {
+  const cost = TOWERS[type].ap;
+  if (isUnlocked(type) || prog.ap < cost) return false;
+  prog.ap -= cost; prog.unlocked.push(type); saveProg();
+  return true;
+}
 
 const fmt = n => (Math.round(n * 10) / 10).toString();
 let panelKey = '';
@@ -911,7 +922,7 @@ function refreshUI() {
     if (b.classList.contains('locked') !== lock) {
       b.classList.toggle('locked', lock);
       b.querySelector('.cost').textContent = lock ? '🔒 ' + TOWERS[t].ap + ' AP' : TOWERS[t].cost;
-      b.title = lock ? '로비의 차고에서 업적 포인트로 해제하세요' : '';
+      b.title = lock ? '눌러서 업적 포인트로 해제' : '';
     }
   }
   const sb = $('startBtn');
@@ -922,7 +933,14 @@ function refreshUI() {
   $('pauseBtn').setAttribute('aria-label', paused ? '계속하기' : '일시정지');
 
   let key, html;
-  if (build) {
+  if (lockView) {
+    const d = TOWERS[lockView], can = prog.ap >= d.ap;
+    key = 'l' + lockView + prog.ap;
+    html = `<h3>${d.name} <span class="lv">🔒 잠김</span></h3><p>${d.desc}</p>
+      <dl class="kv"><dt>해제 비용</dt><dd>${d.ap} AP</dd><dt>보유 업적 포인트</dt><dd>${prog.ap} AP</dd><dt>배치 비용</dt><dd>${d.cost} 금화</dd></dl>
+      <p>${can ? '해제하면 이번 판부터 바로 쓸 수 있고, 앞으로도 계속 쓸 수 있습니다.' : '업적 포인트가 ' + (d.ap - prog.ap) + ' 부족합니다. 제한 시간 안에 클리어해서 모으세요.'}</p>
+      <div class="row"><button class="btn primary grow" type="button" data-act="unlock" ${can ? '' : 'disabled'}>${d.ap} AP로 해제</button><button class="btn" type="button" data-act="cancel">닫기</button></div>`;
+  } else if (build) {
     const d = TOWERS[build];
     key = 'b' + build + (S.gold >= d.cost);
     html = `<h3>${d.name} <span class="lv">${d.cost} 금화</span></h3><p>${d.desc}</p>
@@ -953,7 +971,8 @@ function refreshUI() {
 $('panel').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act;
-  if (a === 'cancel') build = null;
+  if (a === 'cancel') { build = null; lockView = null; }
+  if (a === 'unlock' && lockView && unlockVehicle(lockView)) { const t = lockView; lockView = null; build = t; }
   if (a === 'up') upgrade(sel);
   if (a === 'sell') sell(sel);
   if (a === 'chat' && sel) openChat(sel);
@@ -974,7 +993,7 @@ $('lobbyBtn').addEventListener('click', () => {
 
 // ---------- lobby ----------
 function showLobby() {
-  inLobby = true; closeChat(); build = null; sel = null; leaveArmed = 0;
+  inLobby = true; closeChat(); build = null; sel = null; lockView = null; leaveArmed = 0;
   $('lobbyBtn').textContent = '로비로 나가기';
   document.querySelector('.app').classList.add('in-lobby');
   $('lobby').hidden = false; renderLobby();
@@ -1042,6 +1061,7 @@ cv.addEventListener('pointermove', e => { hover = tileAt(e); });
 cv.addEventListener('pointerdown', e => { hover = tileAt(e); });
 cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hover = null; });
 cv.addEventListener('click', e => {
+  lockView = null;
   if (S.over) return;
   const h = tileAt(e); if (!h) return;
   const t = occ.get(h.c + ',' + h.r);
@@ -1065,7 +1085,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (n >= 1 && n <= ORDER.length) toggleBuild(ORDER[n - 1]);
-  else if (e.key === 'Escape') { build = null; sel = null; }
+  else if (e.key === 'Escape') { build = null; sel = null; lockView = null; }
   else if (e.code === 'Space') { e.preventDefault(); startWave(); }
   else if (e.key === 'u' || e.key === 'U') upgrade(sel);
   else if ((e.key === 'c' || e.key === 'C') && sel) openChat(sel);
