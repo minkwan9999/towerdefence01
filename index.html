@@ -115,6 +115,72 @@ aside { display: grid; gap: 12px; min-width: 0; }
 .keys { color: var(--muted); font-size: 12px; line-height: 1.7; }
 kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); color: var(--text); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+/* Chat: a messenger-style window that pops up when a vehicle is placed. Deliberately light, like a phone chat over the night map. */
+:root {
+  --k-bg: #b2c7d9;
+  --k-head: #a9bfd2;
+  --k-yellow: #fee500;
+  --k-bubble: #ffffff;
+  --k-text: #191919;
+  --k-sub: #4d5d6b;
+  --slowfx: #86d0ee;
+}
+.stat.slowfx .v { color: var(--slowfx); }
+.chat {
+  position: fixed; z-index: 50;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(360px, calc(100vw - 32px)); height: min(560px, calc(100vh - 32px));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--k-bg); color: var(--k-text); border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(0, 0, 0, .2);
+  animation: chatIn .28s cubic-bezier(.2, .9, .3, 1.2);
+}
+.chat[hidden] { display: none; }
+@keyframes chatIn { from { transform: translateY(24px) scale(.96); opacity: 0; } }
+@keyframes pop { from { transform: scale(.85); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .chat, .bubble { animation: none !important; } }
+.chat-head { display: flex; align-items: center; gap: 10px; padding: 12px 12px 10px 14px; background: var(--k-head); }
+.chat-head canvas { width: 38px; height: 38px; border-radius: 14px; background: #2b3230; flex: none; }
+.chat-name { font-weight: 700; font-size: 15px; line-height: 1.2; }
+.chat-sub { font-size: 12px; color: var(--k-sub); }
+.chat-x { margin-left: auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; color: var(--k-text); font-size: 22px; line-height: 1; cursor: pointer; }
+.chat-x:hover { background: rgba(0, 0, 0, .08); }
+.chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+.chat-day { align-self: center; font-size: 11px; color: #fff; background: rgba(0, 0, 0, .18); border-radius: 10px; padding: 2px 10px; margin-bottom: 4px; }
+.row-them { display: flex; gap: 8px; align-items: flex-start; }
+.row-them .ava { width: 38px; height: 38px; flex: none; }
+.row-them .ava canvas { width: 38px; height: 38px; border-radius: 14px; background: #2b3230; display: block; }
+.row-them .stack { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.row-them .who { font-size: 12px; color: var(--k-sub); }
+.line { display: flex; align-items: flex-end; gap: 5px; }
+.row-me { display: flex; justify-content: flex-end; align-items: flex-end; gap: 5px; }
+.bubble {
+  background: var(--k-bubble); color: var(--k-text); padding: 8px 11px; font-size: 14px; line-height: 1.45;
+  border-radius: 4px 14px 14px 14px; max-width: 232px; overflow-wrap: anywhere; animation: pop .18s ease-out;
+}
+.row-me .bubble { background: var(--k-yellow); border-radius: 14px 4px 14px 14px; }
+.bubble .q { font-weight: 700; display: block; margin-bottom: 2px; }
+.bubble.gift { border: 2px solid var(--k-yellow); }
+.msg-time { font-size: 10px; color: var(--k-sub); white-space: nowrap; }
+.typing { display: inline-flex; gap: 4px; padding: 12px 12px; }
+.typing i { width: 6px; height: 6px; border-radius: 50%; background: #9aa4ad; animation: blink 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes blink { 50% { opacity: .25; } }
+.chat-replies { background: #ffffff; padding: 10px; display: grid; gap: 6px; border-top: 1px solid rgba(0, 0, 0, .08); }
+.chat-replies:empty { display: none; }
+.chip {
+  display: flex; align-items: center; gap: 10px; text-align: left; width: 100%;
+  font: inherit; font-size: 14px; color: var(--k-text); background: #fff;
+  border: 1px solid #d6dbe0; border-radius: 12px; padding: 9px 12px; cursor: pointer;
+}
+.chip:hover { background: #f5f7f9; border-color: #b9c2ca; }
+.chip .no { font-family: var(--f-mono); font-size: 11px; color: #fff; background: #5b6b78; border-radius: 6px; padding: 1px 6px; flex: none; }
+.chip .ic { font-size: 20px; flex: none; }
+.chip .t { font-weight: 700; display: block; }
+.chip .s { font-size: 12px; color: var(--k-sub); display: block; }
+.chip:focus-visible, .chat-x:focus-visible { outline: 2px solid #3a6ea5; outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -128,6 +194,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
     <div class="stats" aria-live="polite">
       <div class="stat"><div class="k">웨이브</div><div class="v" id="sWave">0 / 20</div></div>
       <div class="stat gold"><div class="k">금화</div><div class="v" id="sGold">180</div></div>
+      <div class="stat slowfx" id="sSlowBox" hidden><div class="k">적 감속 20%</div><div class="v" id="sSlow">30초</div></div>
       <div class="stat lives" id="sLivesBox"><div class="k">성문 내구도</div><div class="v" id="sLives">20</div></div>
     </div>
   </header>
@@ -160,6 +227,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
       </div>
     </aside>
   </div>
+</div>
+
+<div class="chat" id="chat" role="dialog" aria-label="차량과 대화" hidden>
+  <div class="chat-head">
+    <canvas id="chatAvatar" width="76" height="76" aria-hidden="true"></canvas>
+    <div><div class="chat-name" id="chatName">경찰차</div><div class="chat-sub">퀴즈를 맞히면 선물을 줘요</div></div>
+    <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">×</button>
+  </div>
+  <div class="chat-body" id="chatBody"></div>
+  <div class="chat-replies" id="chatReplies"></div>
 </div>
 
 <script>
@@ -216,14 +293,14 @@ const ER = 16;
 function stats(t) {
   const d = TOWERS[t.type], k = t.lv - 1;
   return {
-    dmg: d.dmg * Math.pow(1.6, k),
+    dmg: d.dmg * Math.pow(1.6, k) * (t.buff || 1),
     range: d.range ? (d.range + .35 * k) * T : 0,
     rate: d.rate * Math.pow(.88, k),
     slow: d.slow ? Math.min(.7, d.slow + .08 * k) : 0,
     slowDur: d.slowDur || 0,
     splash: d.splash ? (d.splash + .15 * k) * T : 0,
     knock: d.knock ? (d.knock + .15 * k) * T : 0,
-    income: d.income ? Math.round(d.income * [1, 1.8, 2.8][k]) : 0,
+    income: d.income ? Math.round(d.income * [1, 1.8, 2.8][k] * (t.buff || 1)) : 0,
   };
 }
 const upCost = t => Math.round(TOWERS[t.type].cost * .75 * t.lv);
@@ -433,9 +510,10 @@ function drawEnemy(g, e) {
 // ---------- state ----------
 let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0;
 function reset() {
-  S = { gold: 180, lives: 20, wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1 };
+  S = { gold: 180, lives: 20, wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
   occ = new Map(); build = null; sel = null; paused = false;
   document.getElementById('overlay').hidden = true;
+  if (typeof closeChat === 'function') closeChat();
 }
 
 function canPlace(c, r) { return c >= 0 && c < COLS && r >= 0 && r < ROWS && !onPath(c, r) && !occ.has(c + ',' + r); }
@@ -509,7 +587,7 @@ function fire(t, e, st) {
   } else if (t.type === 'dump' || t.type === 'crane') {
     const crane = t.type === 'crane';
     const dist = Math.hypot(e.x - t.x, e.y - t.y), dur = crane ? .45 : Math.max(.3, dist / 340);
-    const sp = ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1);
+    const sp = espeed(e);
     const p = posAt(e.d + sp * dur);
     const sx = crane ? t.x + Math.cos(t.ang) * 30 : t.x, sy = crane ? t.y + Math.sin(t.ang) * 30 : t.y;
     S.proj.push({ k: crane ? 'wreck' : 'rock', sx, sy, tx: p.x, ty: p.y, x: sx, y: sy, t: 0, dur, arc: crane ? 26 : 46, dmg: st.dmg, splash: st.splash, src: t });
@@ -526,11 +604,13 @@ function fire(t, e, st) {
   }
 }
 
+const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1);
 function update(dt) {
   for (const f of S.fx) { f.life -= dt; if (f.k === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } if (f.k === 'text') f.y -= 26 * dt; }
   S.fx = S.fx.filter(f => f.life > 0);
   if (S.over) return;
 
+  if (S.slowAll > 0 && S.enemies.length) S.slowAll = Math.max(0, S.slowAll - dt);
   if (S.waveActive && S.queue.length) {
     S.spawnT -= dt;
     if (S.spawnT <= 0) { const q = S.queue.shift(); spawn(q.type); S.spawnT = q.gap; }
@@ -539,7 +619,7 @@ function update(dt) {
     if (!e.alive) continue;
     if (e.flash > 0) e.flash -= dt;
     if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
-    e.d += ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * dt;
+    e.d += espeed(e) * dt;
     if (e.d >= PATH_LEN) { e.alive = false; S.lives -= ENEMIES[e.type].lives; ring(W - 14, 8.5 * T, 6, 50, '#e65a4f', .5); continue; }
     const p = posAt(e.d); e.x = p.x; e.y = p.y;
   }
@@ -693,6 +773,8 @@ function refreshUI() {
   $('sGold').textContent = S.gold;
   $('sLives').textContent = S.lives;
   $('sLivesBox').classList.toggle('low', S.lives <= 5);
+  $('sSlowBox').hidden = !(S.slowAll > 0);
+  $('sSlow').textContent = Math.ceil(S.slowAll) + '초';
   for (const b of shop.children) {
     const t = b.dataset.type;
     b.setAttribute('aria-pressed', String(build === t));
@@ -715,13 +797,13 @@ function refreshUI() {
       <div class="row"><button class="btn grow" type="button" data-act="cancel">취소</button></div>`;
   } else if (sel) {
     const st = stats(sel), d = TOWERS[sel.type], max = sel.lv >= 3, c = max ? 0 : upCost(sel);
-    const nx = max ? null : stats({ type: sel.type, lv: sel.lv + 1 });
-    key = 's' + S.towers.indexOf(sel) + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c);
+    const nx = max ? null : stats({ type: sel.type, lv: sel.lv + 1, buff: sel.buff });
+    key = 's' + S.towers.indexOf(sel) + (sel.buff || 1) + '|' + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c);
     const up = (a, b) => nx ? ` <span class="up">→ ${b}</span>` : '';
     html = `<h3>${d.name} <span class="lv">Lv.${sel.lv}${max ? ' · 최대' : ''}</span></h3>
       <dl class="kv">${st.income ? `<dt>웨이브당 요금</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>번 요금</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
       ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
-      <dt>처치</dt><dd>${sel.kills}</dd>`}</dl>
+      <dt>처치</dt><dd>${sel.kills}</dd>`}${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
       <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell">판매 <span class="mono">+${refund(sel)}</span></button></div>`;
   } else {
     const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
@@ -760,7 +842,7 @@ cv.addEventListener('click', e => {
   const h = tileAt(e); if (!h) return;
   const t = occ.get(h.c + ',' + h.r);
   if (build) {
-    if (canPlace(h.c, h.r)) { if (place(build, h.c, h.r) && !e.shiftKey) build = null; }
+    if (canPlace(h.c, h.r)) { const type = build; if (place(type, h.c, h.r)) { if (!e.shiftKey) build = null; openChat(occ.get(h.c + ',' + h.r)); } }
     else if (t) { sel = t; build = null; }
     return;
   }
@@ -770,6 +852,13 @@ cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel 
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input')) return;
   const n = parseInt(e.key, 10);
+  if (chat) {
+    const chips = chatReplies.querySelectorAll('.chip');
+    if (n >= 1 && n <= chips.length) chips[n - 1].click();
+    else if (e.key === 'Escape') closeChat();
+    if (e.code === 'Space' && !e.target.closest('button')) e.preventDefault();
+    return;
+  }
   if (n >= 1 && n <= ORDER.length) toggleBuild(ORDER[n - 1]);
   else if (e.key === 'Escape') { build = null; sel = null; }
   else if (e.code === 'Space') { e.preventDefault(); startWave(); }
@@ -779,11 +868,183 @@ window.addEventListener('keydown', e => {
   else if (e.key === 'f' || e.key === 'F') speed = speed === 1 ? 2 : speed === 2 ? 3 : 1;
 });
 
+// ---------- chat & quiz ----------
+const QUIZ = [
+  ['태양계에서 가장 큰 행성은?', '목성', ['토성', '지구', '해왕성']],
+  ['물의 화학식은?', 'H₂O', ['CO₂', 'O₂', 'NaCl']],
+  ['한글을 만든 조선의 왕은?', '세종대왕', ['태조', '정조', '영조']],
+  ['지구에서 가장 넓은 바다는?', '태평양', ['대서양', '인도양', '북극해']],
+  ['세계에서 가장 높은 산은?', '에베레스트산', ['K2', '킬리만자로산', '백두산']],
+  ['빛의 삼원색이 아닌 것은?', '노랑', ['빨강', '초록', '파랑']],
+  ['거미의 다리는 몇 개일까요?', '8개', ['6개', '10개', '12개']],
+  ['〈모나리자〉를 그린 화가는?', '레오나르도 다 빈치', ['미켈란젤로', '라파엘로', '피카소']],
+  ['축구 경기에서 한 팀이 경기장에 내보내는 선수 수는?', '11명', ['9명', '10명', '12명']],
+  ['1기압에서 물이 끓는 온도는?', '100℃', ['80℃', '90℃', '120℃']],
+  ['태양에서 가장 가까운 행성은?', '수성', ['금성', '화성', '지구']],
+  ['올림픽 오륜기의 고리는 몇 개일까요?', '5개', ['4개', '6개', '7개']],
+  ['표준 피아노의 건반 수는?', '88개', ['76개', '61개', '100개']],
+  ['〈로미오와 줄리엣〉을 쓴 작가는?', '셰익스피어', ['괴테', '톨스토이', '헤밍웨이']],
+  ['무지개의 색은 흔히 몇 가지라고 할까요?', '7가지', ['5가지', '6가지', '8가지']],
+  ['남극에 살며 날지 못하는 새는?', '펭귄', ['앨버트로스', '갈매기', '독수리']],
+  ['대한민국의 나라꽃은?', '무궁화', ['진달래', '개나리', '장미']],
+  ['면적이 세계에서 가장 넓은 나라는?', '러시아', ['캐나다', '중국', '미국']],
+  ['1시간은 몇 초일까요?', '3600초', ['360초', '600초', '6000초']],
+  ['판다가 주로 먹는 것은?', '대나무', ['물고기', '꿀', '도토리']],
+  ['일본의 수도는?', '도쿄', ['오사카', '교토', '삿포로']],
+  ['프랑스 파리에 있는 유명한 철탑은?', '에펠탑', ['빅벤', '피사의 사탑', '도쿄타워']],
+  ['이순신 장군이 쓴 것으로 유명한 배는?', '거북선', ['판옥선', '황포돛배', '뗏목']],
+  ['개구리의 어릴 때 이름은?', '올챙이', ['장구벌레', '애벌레', '굼벵이']],
+  ['1킬로미터는 몇 미터일까요?', '1000m', ['100m', '10000m', '500m']],
+  ['식물이 빛으로 양분을 만드는 과정은?', '광합성', ['호흡', '증산 작용', '발효']],
+  ['어른 몸의 뼈는 약 몇 개일까요?', '206개', ['106개', '306개', '406개']],
+  ['5만 원권 지폐에 그려진 인물은?', '신사임당', ['이황', '이이', '세종대왕']],
+  ['탄산음료의 톡 쏘는 거품을 만드는 기체는?', '이산화탄소', ['산소', '질소', '수소']],
+  ['삼각형 세 내각의 합은?', '180도', ['90도', '270도', '360도']],
+  ['다음 중 포유류가 아닌 것은?', '상어', ['고래', '박쥐', '돌고래']],
+  ['처음으로 동력 비행기를 띄운 형제는?', '라이트 형제', ['그림 형제', '뤼미에르 형제', '워너 형제']],
+  ['남아 있는 세계에서 가장 오래된 금속활자 책은?', '직지심체요절', ['팔만대장경', '훈민정음 해례본', '동의보감']],
+  ['독도가 있는 바다는?', '동해', ['서해', '남해', '제주 앞바다']],
+  ['음력 8월 15일인 우리 명절은?', '추석', ['설날', '단오', '정월 대보름']],
+  ['7 × 8 은?', '56', ['54', '63', '48']],
+  ['북두칠성을 이루는 별은 몇 개일까요?', '7개', ['5개', '6개', '9개']],
+  ['컴퓨터에서 계산을 맡는 "두뇌" 부품은?', 'CPU', ['모니터', '키보드', '마우스']],
+  ['소리가 가장 빠르게 전달되는 것은?', '철', ['물', '공기', '진공']],
+  ['지구의 하나뿐인 자연 위성은?', '달', ['태양', '화성', '금성']],
+  ['카멜레온이 몸 색을 바꾸는 주된 이유로 알려진 것은?', '기분과 체온 조절', ['배가 고파서', '잠이 와서', '털갈이']],
+  ['신호등에서 "멈춤"을 뜻하는 색은?', '빨강', ['초록', '노랑', '파랑']],
+];
+const GREET = {
+  police: ['충성! 경찰차 출동했습니다 🚓', '이 길목은 제가 지킬게요.'],
+  fire:   ['안녕하세요! 소방차예요 🚒', '불이든 적이든 시원하게 꺼 드릴게요.'],
+  dump:   ['덤프트럭 도착~ 🚛', '돌 한가득 싣고 왔어요. 쏟을 준비 끝!'],
+  bumper: ['범퍼카 등장! 🎢', '다가오는 놈들은 쿵! 하고 밀어 버릴게요 ㅋㅋ'],
+  taxi:   ['손님, 어디로 모실까요? 🚕', '저는 싸움 대신 요금 벌어 올게요.'],
+  crane:  ['크레인입니다 🏗️', '높은 데서 보니까 적들이 다 보이네요.'],
+  flume:  ['후룸라이드 개장했어요! 💦', '근처 오는 애들 다 젖을 각오 해야 할걸요?'],
+  tank:   ['탱크 배치 완료. 🪖', '사거리 안에 들어오면 전부 맞힙니다.'],
+};
+let quizDeck = [];
+function drawQuiz() {
+  if (!quizDeck.length) quizDeck = QUIZ.map((_, i) => i).sort(() => Math.random() - .5);
+  const [q, a, wrong] = QUIZ[quizDeck.pop()];
+  return { q, a, options: [a, ...wrong].sort(() => Math.random() - .5) };
+}
+
+let audio = null;
+function ding() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const now = audio.currentTime;
+    [[880, 0], [1320, .09]].forEach(([f, d]) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0, now + d); g.gain.linearRampToValueAtTime(.12, now + d + .01); g.gain.exponentialRampToValueAtTime(.001, now + d + .22);
+      o.connect(g).connect(audio.destination); o.start(now + d); o.stop(now + d + .25);
+    });
+  } catch (e) { /* sound is optional */ }
+}
+
+const chatEl = $('chat'), chatBody = $('chatBody'), chatReplies = $('chatReplies');
+const chatQueue = []; let chat = null, lastSender = null;
+const clock = () => new Date().toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+function avatarCanvas(type, size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), s = size / 60; g.setTransform(s, 0, 0, s, 0, 0); drawTower(g, type, 30, 30, 1, -.7);
+  return c;
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const scrollDown = () => { chatBody.scrollTop = chatBody.scrollHeight; };
+
+function openChat(t) { chatQueue.push(t); if (!chat) nextChat(); }
+function closeChat() { if (chat) chat.closed = true; chatQueue.length = 0; chat = null; chatEl.hidden = true; chatReplies.innerHTML = ''; }
+
+async function say(tok, html, cls = '') {
+  const t = tok.t;
+  const typing = document.createElement('div'); typing.className = 'row-them';
+  typing.innerHTML = `<div class="ava"></div><div class="stack"><div class="bubble typing"><i></i><i></i><i></i></div></div>`;
+  chatBody.appendChild(typing); scrollDown();
+  await wait(reduceMotion ? 150 : 550 + Math.random() * 350);
+  typing.remove();
+  if (tok.closed) return false;
+  const first = lastSender !== t; lastSender = t;
+  const row = document.createElement('div'); row.className = 'row-them';
+  row.innerHTML = `<div class="ava"></div><div class="stack">${first ? `<div class="who">${TOWERS[t.type].name}</div>` : ''}<div class="line"><div class="bubble ${cls}">${html}</div><span class="msg-time">${clock()}</span></div></div>`;
+  if (first) row.querySelector('.ava').appendChild(avatarCanvas(t.type, 76));
+  chatBody.appendChild(row); scrollDown();
+  return true;
+}
+function me(html) {
+  lastSender = 'me';
+  const row = document.createElement('div'); row.className = 'row-me';
+  row.innerHTML = `<span class="msg-time">${clock()}</span><div class="bubble">${html}</div>`;
+  chatBody.appendChild(row); scrollDown();
+}
+function choose(tok, items) {
+  return new Promise(resolve => {
+    tok.resolve = resolve;
+    chatReplies.innerHTML = '';
+    items.forEach((it, i) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
+      b.innerHTML = it.icon ? `<span class="ic" aria-hidden="true">${it.icon}</span><span><span class="t">${it.label}</span><span class="s">${it.sub}</span></span>` : `<span class="no">${i + 1}</span><span>${it.label}</span>`;
+      b.addEventListener('click', () => { chatReplies.innerHTML = ''; tok.resolve = null; resolve(it); });
+      chatReplies.appendChild(b);
+    });
+    scrollDown();
+    chatReplies.querySelector('button').focus({ preventScroll: true });
+  });
+}
+
+async function nextChat() {
+  const t = chatQueue.shift();
+  if (!t) { chat = null; chatEl.hidden = true; return; }
+  if (!S.towers.includes(t)) return nextChat();
+  const tok = { t, closed: false }; chat = tok; lastSender = null;
+  const d = TOWERS[t.type];
+  const head = $('chatAvatar').getContext('2d'); head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76); head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawTower(head, t.type, 30, 30, 1, -.7);
+  $('chatName').textContent = d.name;
+  chatBody.innerHTML = `<div class="chat-day">${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</div>`;
+  chatReplies.innerHTML = '';
+  chatEl.hidden = false; ding();
+
+  for (const line of GREET[t.type]) if (!await say(tok, line)) return;
+  if (!await say(tok, '심심한데 퀴즈 하나 낼게요. 맞히면 선물 드려요 🎁')) return;
+  const q = drawQuiz();
+  if (!await say(tok, `<span class="q">Q. ${q.q}</span>`)) return;
+  const pick = await choose(tok, q.options.map(o => ({ label: o })));
+  if (!pick || tok.closed) return;
+  me(pick.label);
+  if (pick.label !== q.a) {
+    if (!await say(tok, `땡! 정답은 <b>${q.a}</b>였어요 😅`)) return;
+    if (!await say(tok, '다음에 또 문제 낼게요. 전투는 맡겨 주세요!')) return;
+  } else {
+    if (!await say(tok, '정답! 👏 선물 하나 골라 보세요.', 'gift')) return;
+    const gold = 40 + S.wave * 5;
+    const taxi = t.type === 'taxi';
+    const reward = await choose(tok, [
+      { key: 'gold', icon: '💰', label: `금화 +${gold}`, sub: '바로 받아서 차량을 더 세워요' },
+      { key: 'slow', icon: '🐢', label: '적 속도 20% 감소', sub: '전투 중 30초 동안 모든 적이 느려져요' },
+      { key: 'buff', icon: taxi ? '🧾' : '💥', label: taxi ? '이 택시 요금 +25%' : `${d.name} 공격력 +25%`, sub: '이 차량에게 영구히 적용돼요' },
+    ]);
+    if (!reward || tok.closed) return;
+    me(`${reward.icon} ${reward.label}`);
+    if (reward.key === 'gold') { S.gold += gold; floatText(t.x, t.y - 26, '+' + gold, '#e2b54a'); }
+    if (reward.key === 'slow') { S.slowAll = Math.max(S.slowAll, 0) + 30; }
+    if (reward.key === 'buff' && S.towers.includes(t)) { t.buff = (t.buff || 1) + .25; ring(t.x, t.y, 12, 40, '#fee500', .5); }
+    panelKey = '';
+    const thanks = { gold: `금화 ${gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: taxi ? '요금 할증 붙였어요! 더 벌어 올게요 🚕' : '힘이 솟네요! 더 세게 쏠게요 💪' }[reward.key];
+    if (!await say(tok, thanks)) return;
+  }
+  await wait(1300);
+  if (tok.closed) return;
+  nextChat();
+}
+$('chatClose').addEventListener('click', closeChat);
+
 // ---------- loop ----------
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  if (!paused) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
+  if (!paused && !chat) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
   render(); refreshUI();
   requestAnimationFrame(frame);
 }
@@ -792,14 +1053,14 @@ function start(data) {
   reset();
   if (data && Array.isArray(data.towers) && !data.over) {
     S.gold = data.gold; S.lives = data.lives; S.wave = data.wave;
-    for (const t of data.towers) { if (!TOWERS[t.type]) continue; S.gold += TOWERS[t.type].cost; place(t.type, t.c, t.r); const p = occ.get(t.c + ',' + t.r); if (p) { p.lv = t.lv; p.invested = t.invested; p.kills = t.kills; } }
+    for (const t of data.towers) { if (!TOWERS[t.type]) continue; S.gold += TOWERS[t.type].cost; place(t.type, t.c, t.r); const p = occ.get(t.c + ',' + t.r); if (p) { p.lv = t.lv; p.invested = t.invested; p.kills = t.kills; p.buff = t.buff || 1; } }
     S.fx = [];
   }
   requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
 }
 window.claude?.hot?.snapshot?.(() => ({
   gold: S.gold, lives: S.lives, wave: S.waveActive ? S.wave - 1 : S.wave, over: S.over,
-  towers: S.towers.map(t => ({ type: t.type, c: t.c, r: t.r, lv: t.lv, invested: t.invested, kills: t.kills })),
+  towers: S.towers.map(t => ({ type: t.type, c: t.c, r: t.r, lv: t.lv, invested: t.invested, kills: t.kills, buff: t.buff || 1 })),
 }));
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
