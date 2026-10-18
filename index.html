@@ -110,88 +110,114 @@ aside { display: grid; gap: 12px; min-width: 0; }
 .btn .mono { font-family: var(--f-mono); font-size: 13px; }
 .btn.grow { flex: 1 1 auto; }
 .controls { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; }
+#lobbyBtn { justify-self: start; }
 .auto { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
 .auto input { accent-color: var(--brass); width: 16px; height: 16px; }
 .keys { color: var(--muted); font-size: 12px; line-height: 1.7; }
 kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); color: var(--text); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
-/* Chat: a messenger-style window that pops up when a vehicle is placed. Deliberately light, like a phone chat over the night map. */
-:root {
-  --k-bg: #b2c7d9;
-  --k-head: #a9bfd2;
-  --k-yellow: #fee500;
-  --k-bubble: #ffffff;
-  --k-text: #191919;
-  --k-sub: #4d5d6b;
-  --slowfx: #86d0ee;
-}
-.stat.slowfx .v { color: var(--slowfx); }
+/* Chat: a vehicle radio channel in the game's own dark palette. Tower messages carry a stripe in that vehicle's color (--tc). */
 .chat {
   position: fixed; z-index: 50;
   left: max(16px, env(safe-area-inset-left, 0px));
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   width: min(360px, calc(100vw - 32px)); height: min(560px, calc(100vh - 32px));
   display: flex; flex-direction: column; overflow: hidden;
-  background: var(--k-bg); color: var(--k-text); border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(0, 0, 0, .2);
-  animation: chatIn .28s cubic-bezier(.2, .9, .3, 1.2);
+  --tc: var(--brass);
+  background-color: var(--panel); color: var(--text);
+  background-image: repeating-linear-gradient(0deg, rgba(235, 230, 211, .018) 0 1px, transparent 1px 4px);
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(235, 230, 211, .05);
+  animation: chatIn .25s ease-out;
 }
 .chat[hidden] { display: none; }
-@keyframes chatIn { from { transform: translateY(24px) scale(.96); opacity: 0; } }
-@keyframes pop { from { transform: scale(.85); opacity: 0; } }
+@keyframes chatIn { from { transform: translateY(16px); opacity: 0; } }
+@keyframes pop { from { transform: translateX(-6px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .chat, .bubble { animation: none !important; } }
-.chat-head { display: flex; align-items: center; gap: 10px; padding: 12px 12px 10px 14px; background: var(--k-head); }
-.chat-head canvas { width: 38px; height: 38px; border-radius: 14px; background: #2b3230; flex: none; }
+.chat-head { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; background: var(--ink); border-bottom: 1px solid var(--line); }
+.chat-head canvas { width: 38px; height: 38px; border-radius: 6px; background: #2b3230; flex: none; box-shadow: 0 0 0 2px var(--tc); }
 .chat-name { font-weight: 700; font-size: 15px; line-height: 1.2; }
-.chat-sub { font-size: 12px; color: var(--k-sub); }
-.chat-x { margin-left: auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; color: var(--k-text); font-size: 22px; line-height: 1; cursor: pointer; }
-.chat-x:hover { background: rgba(0, 0, 0, .08); }
-.chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px 16px; display: flex; flex-direction: column; gap: 6px; }
-.chat-day { align-self: center; font-size: 11px; color: #fff; background: rgba(0, 0, 0, .18); border-radius: 10px; padding: 2px 10px; margin-bottom: 4px; }
-.row-them { display: flex; gap: 8px; align-items: flex-start; }
-.row-them .ava { width: 38px; height: 38px; flex: none; }
-.row-them .ava canvas { width: 38px; height: 38px; border-radius: 14px; background: #2b3230; display: block; }
-.row-them .stack { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.row-them .who { font-size: 12px; color: var(--k-sub); }
-.line { display: flex; align-items: flex-end; gap: 5px; }
-.row-me { display: flex; justify-content: flex-end; align-items: flex-end; gap: 5px; }
+.chat-sub { font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: .04em; display: flex; align-items: center; gap: 6px; }
+.chat-sub::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #7ed35f; box-shadow: 0 0 6px #7ed35f; animation: blink 1.6s infinite; }
+.chat-x { margin-left: auto; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.chat-x:hover { color: var(--text); border-color: var(--muted); }
+.chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.chat-day { display: flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 10px; letter-spacing: .12em; color: var(--muted); margin-bottom: 4px; }
+.chat-day::before, .chat-day::after { content: ""; flex: 1; border-top: 1px dashed var(--line); }
+.row-them { display: flex; flex-direction: column; align-items: flex-start; }
+.row-them .ava { display: none; }
+.row-them .stack { display: flex; flex-direction: column; gap: 3px; min-width: 0; max-width: 88%; }
+.row-them .who { font-family: var(--f-mono); font-size: 11px; color: var(--tc); letter-spacing: .06em; margin-top: 4px; }
+.row-them .who::after { content: " ▸ 수신"; color: var(--muted); }
+.line { display: flex; align-items: flex-end; gap: 6px; }
+.row-me { display: flex; justify-content: flex-end; align-items: flex-end; gap: 6px; margin-top: 2px; }
 .bubble {
-  background: var(--k-bubble); color: var(--k-text); padding: 8px 11px; font-size: 14px; line-height: 1.45;
-  border-radius: 4px 14px 14px 14px; max-width: 232px; overflow-wrap: anywhere; animation: pop .18s ease-out;
+  background: rgba(235, 230, 211, .05); color: var(--text); padding: 7px 11px; font-size: 14px; line-height: 1.5;
+  border-left: 3px solid var(--tc); border-radius: 2px 6px 6px 2px; overflow-wrap: anywhere; animation: pop .16s ease-out;
 }
-.row-me .bubble { background: var(--k-yellow); border-radius: 14px 4px 14px 14px; }
-.bubble .q { font-weight: 700; display: block; margin-bottom: 2px; }
-.bubble.gift { border: 2px solid var(--k-yellow); }
-.msg-time { font-size: 10px; color: var(--k-sub); white-space: nowrap; }
-.typing { display: inline-flex; gap: 4px; padding: 12px 12px; }
-.typing i { width: 6px; height: 6px; border-radius: 50%; background: #9aa4ad; animation: blink 1s infinite; }
+.row-me .bubble { background: transparent; border: 1px solid rgba(226, 181, 74, .55); border-radius: 6px 2px 2px 6px; color: #f2e3b8; max-width: 80%; }
+.bubble .q { font-weight: 700; display: block; color: var(--brass); }
+.bubble.gift { border-left-color: var(--brass); background: rgba(226, 181, 74, .1); }
+.msg-time { font-family: var(--f-mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.typing { display: inline-flex; gap: 4px; padding: 11px 12px; }
+.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--tc); animation: blink 1s infinite; }
 .typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
 @keyframes blink { 50% { opacity: .25; } }
-.chat-replies { background: #ffffff; padding: 10px; display: grid; gap: 6px; border-top: 1px solid rgba(0, 0, 0, .08); }
+.chat-replies { background: var(--ink); padding: 10px; display: grid; gap: 6px; border-top: 1px solid var(--line); }
 .chat-replies:empty { display: none; }
 .chip {
   display: flex; align-items: center; gap: 10px; text-align: left; width: 100%;
-  font: inherit; font-size: 14px; color: var(--k-text); background: #fff;
-  border: 1px solid #d6dbe0; border-radius: 12px; padding: 9px 12px; cursor: pointer;
+  font: inherit; font-size: 14px; color: var(--text); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; cursor: pointer;
 }
-.chip:hover { background: #f5f7f9; border-color: #b9c2ca; }
-.chip .no { font-family: var(--f-mono); font-size: 11px; color: #fff; background: #5b6b78; border-radius: 6px; padding: 1px 6px; flex: none; }
+.chip:hover { border-color: var(--brass); }
+.chip .no { font-family: var(--f-mono); font-size: 11px; font-weight: 700; color: #1d1606; background: var(--brass); border-radius: 3px; padding: 1px 6px; flex: none; }
 .chip .ic { font-size: 20px; flex: none; }
 .chip .t { font-weight: 700; display: block; }
-.chip .s { font-size: 12px; color: var(--k-sub); display: block; }
-.chat-compose { background: #ffffff; padding: 8px 10px 10px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; border-top: 1px solid rgba(0, 0, 0, .08); }
+.chip .s { font-size: 12px; color: var(--muted); display: block; }
+.chat-compose { background: var(--ink); padding: 8px 10px 10px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; border-top: 1px solid var(--line); }
 .chat-replies:not(:empty) + .chat-compose { border-top: 0; }
 .chat-suggest { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .chat-suggest:empty { display: none; }
-.pill { flex: none; font: inherit; font-size: 13px; color: var(--k-text); background: #f1f3f5; border: 1px solid #dde2e6; border-radius: 16px; padding: 5px 11px; cursor: pointer; }
-.pill:hover { background: #e7ebee; }
+.pill { flex: none; font: inherit; font-size: 13px; color: var(--muted); background: transparent; border: 1px dashed var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+.pill:hover { color: var(--text); border-color: var(--muted); }
 .chat-form { display: flex; gap: 6px; }
-.chat-form input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: var(--k-text); background: #f5f6f7; border: 1px solid #dde2e6; border-radius: 18px; padding: 8px 14px; color-scheme: light; }
-.chat-form input:disabled { background: #eceff1; }
-.chat-form button { font: inherit; font-weight: 700; font-size: 14px; border: 0; border-radius: 18px; padding: 0 16px; background: var(--k-yellow); color: var(--k-text); cursor: pointer; }
-.chat-form button:disabled { opacity: .45; cursor: default; }
-.chip:focus-visible, .chat-x:focus-visible, .pill:focus-visible, .chat-form button:focus-visible, .chat-form input:focus-visible { outline: 2px solid #3a6ea5; outline-offset: 2px; }
+.chat-form input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; }
+.chat-form input::placeholder { color: var(--muted); }
+.chat-form input:disabled { opacity: .5; }
+.chat-form button { font: inherit; font-weight: 700; font-size: 14px; border: 0; border-radius: 6px; padding: 0 16px; background: var(--brass); color: #1d1606; cursor: pointer; }
+.chat-form button:disabled { opacity: .4; cursor: default; }
+.chip:focus-visible, .chat-x:focus-visible, .pill:focus-visible, .chat-form button:focus-visible, .chat-form input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+/* Lobby */
+.app.in-lobby .game-only { display: none !important; }
+.stat.ap .v { color: #c2a6ff; }
+.stat.time.late .v { color: var(--danger); }
+.lobby { display: grid; gap: 14px; }
+.lobby[hidden] { display: none; }
+.lobby-intro { max-width: 68ch; color: var(--muted); margin: 0; }
+.lobby-intro b { color: var(--text); font-weight: 700; }
+.diffs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.dcard { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--dc); border-radius: 6px; padding: 12px 14px; display: grid; gap: 10px; align-content: start; }
+.dtop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.dname { font-family: var(--f-display); font-size: 24px; line-height: 1; color: var(--dc); }
+.dlv { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.dcard .kv { font-size: 12.5px; }
+.garage { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.gcard { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.gcard canvas { width: 44px; height: 44px; }
+.gcard.locked canvas { opacity: .35; filter: grayscale(1); }
+.gcard .nm { font-weight: 700; }
+.gcard .ds { font-size: 12px; color: var(--muted); line-height: 1.4; margin: 2px 0 8px; }
+.gcard .act { display: flex; }
+.owned { font-family: var(--f-mono); font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; }
+.btn.sm { padding: 6px 10px; font-size: 13px; }
+.fine { color: var(--muted); font-size: 12px; margin: 0; }
+.tcard.locked { cursor: not-allowed; }
+.tcard.locked canvas { opacity: .3; filter: grayscale(1); }
+.tcard.locked .cost { color: var(--muted); }
+.overlay .row { justify-content: center; }
 </style>
 </head>
 <body>
@@ -203,14 +229,25 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
       <h1>협곡 방어전</h1>
     </div>
     <div class="stats" aria-live="polite">
-      <div class="stat"><div class="k">웨이브</div><div class="v" id="sWave">0 / 20</div></div>
-      <div class="stat gold"><div class="k">금화</div><div class="v" id="sGold">180</div></div>
-      <div class="stat slowfx" id="sSlowBox" hidden><div class="k">적 감속 20%</div><div class="v" id="sSlow">30초</div></div>
-      <div class="stat lives" id="sLivesBox"><div class="k">성문 내구도</div><div class="v" id="sLives">20</div></div>
+      <div class="stat time game-only" id="sTimeBox"><div class="k" id="sDiff">이지 · 제한 16:00</div><div class="v" id="sTime">00:00</div></div>
+      <div class="stat game-only"><div class="k">웨이브</div><div class="v" id="sWave">0 / 20</div></div>
+      <div class="stat gold game-only"><div class="k">금화</div><div class="v" id="sGold">180</div></div>
+      <div class="stat slowfx game-only" id="sSlowBox" hidden><div class="k">적 감속 20%</div><div class="v" id="sSlow">30초</div></div>
+      <div class="stat lives game-only" id="sLivesBox"><div class="k">성문 내구도</div><div class="v" id="sLives">20</div></div>
+      <div class="stat ap"><div class="k">업적 포인트</div><div class="v" id="sAP">0</div></div>
     </div>
   </header>
 
-  <div class="main">
+  <section class="lobby game-lobby" id="lobby" hidden>
+    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 차고에서 새 차량을 해제합니다. 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
+    <div class="section-label">난이도 선택</div>
+    <div class="diffs" id="diffs"></div>
+    <div class="section-label">차고 · 차량 해제</div>
+    <div class="garage" id="garage"></div>
+    <p class="fine">기록과 업적 포인트는 이 브라우저에 저장됩니다. 시간은 게임 속도와 상관없이 게임 안의 시간으로 잽니다.</p>
+  </section>
+
+  <div class="main game-only" id="mainGame">
     <div class="board">
       <canvas id="game" aria-label="타워 디펜스 게임판"></canvas>
       <div class="overlay" id="overlay" hidden>
@@ -218,7 +255,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
           <div class="eyebrow" id="ovEyebrow">전투 종료</div>
           <h2 id="ovTitle">성문이 무너졌습니다</h2>
           <p id="ovText">웨이브 7까지 버텼습니다.</p>
-          <button class="btn primary" id="restartBtn" type="button">다시 하기</button>
+          <p id="ovNote">금화는 사라지고 업적 포인트만 남습니다.</p>
+          <div class="row"><button class="btn primary" id="restartBtn" type="button">같은 난이도 다시</button><button class="btn" id="ovLobbyBtn" type="button">로비로</button></div>
         </div>
       </div>
     </div>
@@ -232,6 +270,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
         <button class="btn" id="speedBtn" type="button" aria-label="게임 속도"><span class="mono">1×</span></button>
         <button class="btn" id="pauseBtn" type="button" aria-label="일시정지">❚❚</button>
       </div>
+      <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
       <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
       <div class="keys">
         <kbd>1</kbd>–<kbd>8</kbd> 차량 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
@@ -243,7 +282,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 <div class="chat" id="chat" role="dialog" aria-label="차량과 대화" hidden>
   <div class="chat-head">
     <canvas id="chatAvatar" width="76" height="76" aria-hidden="true"></canvas>
-    <div><div class="chat-name" id="chatName">경찰차</div><div class="chat-sub">수다 떨다 보면 퀴즈를 낼지도 몰라요</div></div>
+    <div><div class="chat-name" id="chatName">경찰차</div><div class="chat-sub">무전 채널 연결됨</div></div>
     <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">×</button>
   </div>
   <div class="chat-body" id="chatBody"></div>
@@ -251,8 +290,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   <div class="chat-compose">
     <div class="chat-suggest" id="chatSuggest"></div>
     <form class="chat-form" id="chatForm" autocomplete="off">
-      <input id="chatInput" type="text" maxlength="80" placeholder="메시지 입력" aria-label="메시지 입력">
-      <button id="chatSend" type="submit">전송</button>
+      <input id="chatInput" type="text" maxlength="80" placeholder="무전 보내기" aria-label="무전 보내기">
+      <button id="chatSend" type="submit">송신</button>
     </form>
   </div>
 </div>
@@ -289,15 +328,35 @@ for (let i = 0; i < WAYPOINTS.length - 1; i++) {
 
 // ---------- definitions ----------
 const TOWERS = {
-  police: { name: '경찰차',     cost: 50,  range: 2.6, dmg: 11, rate: .45, color: '#5b8def', desc: '사이렌을 울리며 빠르게 연사합니다. 어디에 두어도 제 몫을 합니다.' },
-  fire:   { name: '소방차',     cost: 70,  range: 2.3, dmg: 6,  rate: .7, slow: .45, slowDur: 1.6, color: '#e2453a', desc: '물대포를 맞은 적은 느려집니다. 화력 좋은 차 앞에 두세요.' },
-  dump:   { name: '덤프트럭',   cost: 90,  range: 2.4, dmg: 30, rate: 1.5, splash: .95, color: '#f0b429', desc: '돌무더기를 쏟아부어 떨어진 자리 주변을 모두 때립니다.' },
-  bumper: { name: '범퍼카',     cost: 60,  range: 1.4, dmg: 14, rate: .9, knock: .6, color: '#ff5fa2', desc: '가까이 온 적을 들이받아 뒤로 밀어냅니다. 길 모퉁이에 좋습니다.' },
-  taxi:   { name: '택시',       cost: 80,  range: 0,   dmg: 0,  rate: 0, income: 15, color: '#f7c600', desc: '싸우지 않습니다. 웨이브를 막을 때마다 요금을 벌어 옵니다.' },
-  crane:  { name: '크레인',     cost: 120, range: 2.0, dmg: 90, rate: 2.4, splash: .6, color: '#e8a317', desc: '철거용 쇠공을 떨어뜨립니다. 느리지만 한 방이 아주 셉니다.' },
-  flume:  { name: '후룸라이드', cost: 130, range: 1.9, dmg: 18, rate: 1.3, pulse: true, slow: .25, slowDur: .8, color: '#4fb3e8', desc: '물보라를 일으켜 범위 안의 적 모두를 적시고 조금 늦춥니다.' },
-  tank:   { name: '탱크',       cost: 160, range: 3.6, dmg: 70, rate: 1.6, color: '#7c8b45', desc: '사거리가 가장 깁니다. 멀리서 강한 포탄을 쏩니다.' },
+  police: { name: '경찰차',     ap: 0, cost: 50,  range: 2.6, dmg: 11, rate: .45, color: '#5b8def', desc: '사이렌을 울리며 빠르게 연사합니다. 어디에 두어도 제 몫을 합니다.' },
+  fire:   { name: '소방차',     ap: 0, cost: 70,  range: 2.3, dmg: 6,  rate: .7, slow: .45, slowDur: 1.6, color: '#e2453a', desc: '물대포를 맞은 적은 느려집니다. 화력 좋은 차 앞에 두세요.' },
+  dump:   { name: '덤프트럭',   ap: 10, cost: 90,  range: 2.4, dmg: 30, rate: 1.5, splash: .95, color: '#f0b429', desc: '돌무더기를 쏟아부어 떨어진 자리 주변을 모두 때립니다.' },
+  bumper: { name: '범퍼카',     ap: 10, cost: 60,  range: 1.4, dmg: 14, rate: .9, knock: .6, color: '#ff5fa2', desc: '가까이 온 적을 들이받아 뒤로 밀어냅니다. 길 모퉁이에 좋습니다.' },
+  taxi:   { name: '택시',       ap: 20, cost: 80,  range: 0,   dmg: 0,  rate: 0, income: 15, color: '#f7c600', desc: '싸우지 않습니다. 웨이브를 막을 때마다 요금을 벌어 옵니다.' },
+  crane:  { name: '크레인',     ap: 30, cost: 120, range: 2.0, dmg: 90, rate: 2.4, splash: .6, color: '#e8a317', desc: '철거용 쇠공을 떨어뜨립니다. 느리지만 한 방이 아주 셉니다.' },
+  flume:  { name: '후룸라이드', ap: 40, cost: 130, range: 1.9, dmg: 18, rate: 1.3, pulse: true, slow: .25, slowDur: .8, color: '#4fb3e8', desc: '물보라를 일으켜 범위 안의 적 모두를 적시고 조금 늦춥니다.' },
+  tank:   { name: '탱크',       ap: 60, cost: 160, range: 3.6, dmg: 70, rate: 1.6, color: '#7c8b45', desc: '사거리가 가장 깁니다. 멀리서 강한 포탄을 쏩니다.' },
 };
+const DIFF_STEP = 1.2;
+const DIFFS = [
+  { id: 'easy',   name: '이지',     limit: 16 * 60, ap: 10, color: '#a5d46a' },
+  { id: 'normal', name: '노멀',     limit: 15 * 60, ap: 20, color: '#86d0ee' },
+  { id: 'hard',   name: '하드',     limit: 14 * 60, ap: 35, color: '#e2b54a' },
+  { id: 'hell',   name: '헬',       limit: 13 * 60, ap: 55, color: '#e8955a' },
+  { id: 'crazy',  name: '크레이지', limit: 12 * 60, ap: 80, color: '#e65a4f' },
+];
+const dmult = i => Math.pow(DIFF_STEP, i);
+const mmss = sec => { sec = Math.max(0, Math.floor(sec)); return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0'); };
+const SAVE_KEY = 'canyonhold.progress.v1';
+function loadProg() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
+  p = p && typeof p === 'object' ? p : {};
+  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {} };
+}
+const prog = loadProg();
+function saveProg() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(prog)); } catch (e) { /* progress stays for this visit only */ } }
+const isUnlocked = type => prog.unlocked.includes(type);
 const ORDER = ['police', 'fire', 'dump', 'bumper', 'taxi', 'crane', 'flume', 'tank'];
 // 적군은 아군과 똑같은 차량을 검은색으로 칠한 것입니다.
 const ENEMIES = {
@@ -526,9 +585,9 @@ function drawEnemy(g, e) {
 }
 
 // ---------- state ----------
-let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0;
-function reset() {
-  S = { gold: 180, lives: 20, wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
+let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true;
+function reset(diff) {
+  S = { diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180, lives: 20, wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
   occ = new Map(); build = null; sel = null; paused = false;
   document.getElementById('overlay').hidden = true;
   if (typeof closeChat === 'function') closeChat();
@@ -592,7 +651,7 @@ function hurt(e, dmg, src) {
   }
 }
 function spawn(type) {
-  const d = ENEMIES[type], scale = Math.pow(1.145, S.wave - 1), hp = d.hp * scale;
+  const d = ENEMIES[type], scale = Math.pow(1.145, S.wave - 1) * dmult(S.diff), hp = d.hp * scale;
   const p = posAt(0);
   S.enemies.push({ type, hp, maxHp: hp, d: 0, x: p.x, y: p.y, alive: true, slowT: 0, slowF: 0, flash: 0 });
 }
@@ -623,11 +682,12 @@ function fire(t, e, st) {
   }
 }
 
-const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1);
+const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1) * dmult(S.diff);
 function update(dt) {
   for (const f of S.fx) { f.life -= dt; if (f.k === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } if (f.k === 'text') f.y -= 26 * dt; }
   S.fx = S.fx.filter(f => f.life > 0);
   if (S.over) return;
+  S.time += dt;
 
   if (S.slowAll > 0 && S.enemies.length) S.slowAll = Math.max(0, S.slowAll - dt);
   if (S.waveActive && S.queue.length) {
@@ -695,13 +755,23 @@ function update(dt) {
 }
 
 function endGame(won) {
-  S.over = true; S.won = won; build = null;
-  document.getElementById('ovEyebrow').textContent = won ? '승리' : '전투 종료';
-  document.getElementById('ovTitle').textContent = won ? '협곡을 지켜냈습니다' : '성문이 무너졌습니다';
-  document.getElementById('ovText').textContent = won
-    ? '20개 웨이브를 모두 막아냈습니다. 남은 성문 내구도 ' + S.lives + '.'
-    : '웨이브 ' + S.wave + '에서 무너졌습니다. 탑 ' + S.towers.length + '개가 싸웠습니다.';
-  document.getElementById('overlay').hidden = false;
+  S.over = true; S.won = won; build = null; closeChat();
+  const D = DIFFS[S.diff], rec = prog.rec[D.id] = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
+  rec.plays++;
+  let earned = 0;
+  if (won) {
+    rec.clears++;
+    if (rec.best == null || S.time < rec.best) rec.best = S.time;
+    if (S.time <= D.limit) { earned = D.ap; prog.ap += earned; }
+  }
+  saveProg();
+  $('ovEyebrow').textContent = D.name + (won ? ' · 클리어' : ' · 전투 종료');
+  $('ovTitle').textContent = won ? (earned ? '업적 포인트 +' + earned : '클리어! 하지만 시간 초과') : '성문이 무너졌습니다';
+  $('ovText').textContent = won
+    ? '클리어 시간 ' + mmss(S.time) + ' / 제한 ' + mmss(D.limit) + (earned ? '. 제한 시간 안에 막아냈습니다.' : '. 제한 시간을 넘겨 업적 포인트는 없습니다.')
+    : '웨이브 ' + S.wave + '에서 무너졌습니다. 플레이 시간 ' + mmss(S.time) + '.';
+  $('ovNote').textContent = '금화는 사라지고 업적 포인트만 남습니다. 보유 업적 포인트 ' + prog.ap + '.';
+  $('overlay').hidden = false;
 }
 
 // ---------- render ----------
@@ -720,9 +790,9 @@ function render() {
   for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
   for (const t of S.towers) if (t.unread > 0) {
     const bx = t.x + 20, by = t.y - 22;
-    ctx.fillStyle = '#ef4f45'; circle(ctx, bx, by, 9); ctx.fill();
+    ctx.fillStyle = '#e2b54a'; circle(ctx, bx, by, 9); ctx.fill();
     ctx.strokeStyle = '#0e1714'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.fillText(String(Math.min(9, t.unread)), bx, by + 4);
+    ctx.fillStyle = '#1d1606'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.fillText(String(Math.min(9, t.unread)), bx, by + 4);
   }
   if (sel) { ctx.strokeStyle = '#e2b54a'; ctx.lineWidth = 2; rr(ctx, sel.x - 27, sel.y - 27, 54, 54, 10); ctx.stroke(); }
   const sorted = S.enemies.slice().sort((a, b) => a.y - b.y);
@@ -789,12 +859,19 @@ for (const [i, type] of ORDER.entries()) {
   const g = b.querySelector('canvas').getContext('2d'); g.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(g, type, 30, 32, 1, -.7);
   b.addEventListener('click', () => toggleBuild(type));
   shop.appendChild(b);
+  b.dataset.cost = d.cost;
 }
-function toggleBuild(type) { if (S.over) return; build = build === type ? null : type; sel = null; }
+function toggleBuild(type) { if (S.over || !isUnlocked(type)) return; build = build === type ? null : type; sel = null; }
 
 const fmt = n => (Math.round(n * 10) / 10).toString();
 let panelKey = '';
 function refreshUI() {
+  $('sAP').textContent = prog.ap;
+  if (inLobby) return;
+  const D = DIFFS[S.diff];
+  $('sDiff').textContent = D.name + ' · 제한 ' + mmss(D.limit);
+  $('sTime').textContent = mmss(S.time);
+  $('sTimeBox').classList.toggle('late', S.time > D.limit);
   $('sWave').textContent = S.wave + ' / ' + MAX_WAVE;
   $('sGold').textContent = S.gold;
   $('sLives').textContent = S.lives;
@@ -804,7 +881,13 @@ function refreshUI() {
   for (const b of shop.children) {
     const t = b.dataset.type;
     b.setAttribute('aria-pressed', String(build === t));
-    b.classList.toggle('poor', S.gold < TOWERS[t].cost);
+    const lock = !isUnlocked(t);
+    b.classList.toggle('poor', !lock && S.gold < TOWERS[t].cost);
+    if (b.classList.contains('locked') !== lock) {
+      b.classList.toggle('locked', lock);
+      b.querySelector('.cost').textContent = lock ? '🔒 ' + TOWERS[t].ap + ' AP' : TOWERS[t].cost;
+      b.title = lock ? '로비의 차고에서 업적 포인트로 해제하세요' : '';
+    }
   }
   const sb = $('startBtn');
   sb.disabled = S.waveActive || S.over || S.wave >= MAX_WAVE;
@@ -831,7 +914,7 @@ function refreshUI() {
       ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
       <dt>처치</dt><dd>${sel.kills}</dd>`}${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
       <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell">판매 <span class="mono">+${refund(sel)}</span></button></div>
-      <button class="btn" type="button" data-act="chat">💬 ${TOWERS[sel.type].name}와 대화하기</button>`;
+      <button class="btn" type="button" data-act="chat">📻 ${TOWERS[sel.type].name}와 무전하기</button>`;
   } else {
     const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
     const counts = {}; for (const q of buildWave(nextW)) counts[q.type] = (counts[q.type] || 0) + 1;
@@ -854,7 +937,54 @@ $('panel').addEventListener('click', e => {
 $('startBtn').addEventListener('click', startWave);
 $('speedBtn').addEventListener('click', () => { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; });
 $('pauseBtn').addEventListener('click', () => { paused = !paused; });
-$('restartBtn').addEventListener('click', () => { reset(); panelKey = ''; });
+$('restartBtn').addEventListener('click', () => startGame(S.diff));
+$('ovLobbyBtn').addEventListener('click', showLobby);
+let leaveArmed = 0;
+$('lobbyBtn').addEventListener('click', () => {
+  if (S.wave === 0 || S.over || leaveArmed > performance.now()) { leaveArmed = 0; showLobby(); return; }
+  leaveArmed = performance.now() + 3000;
+  $('lobbyBtn').textContent = '나가면 이번 판은 기록되지 않아요 · 한 번 더 누르기';
+  setTimeout(() => { if (leaveArmed && leaveArmed <= performance.now() + 50) { leaveArmed = 0; $('lobbyBtn').textContent = '로비로 나가기'; } }, 3050);
+});
+
+// ---------- lobby ----------
+function showLobby() {
+  inLobby = true; closeChat(); build = null; sel = null; leaveArmed = 0;
+  $('lobbyBtn').textContent = '로비로 나가기';
+  document.querySelector('.app').classList.add('in-lobby');
+  $('lobby').hidden = false; renderLobby();
+}
+function startGame(i) {
+  reset(i); panelKey = ''; inLobby = false;
+  document.querySelector('.app').classList.remove('in-lobby');
+  $('lobby').hidden = true;
+}
+function renderLobby() {
+  $('diffs').innerHTML = DIFFS.map((D, i) => {
+    const r = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
+    return `<div class="dcard" style="--dc:${D.color}">
+      <div class="dtop"><span class="dname">${D.name}</span><span class="dlv">단계 ${i + 1}</span></div>
+      <dl class="kv"><dt>적 체력·속도</dt><dd>×${dmult(i).toFixed(2)}</dd><dt>제한 시간</dt><dd>${mmss(D.limit)}</dd><dt>클리어 보상</dt><dd>+${D.ap} AP</dd><dt>최고 기록</dt><dd>${r.best == null ? '—' : mmss(r.best)}</dd><dt>클리어 / 플레이</dt><dd>${r.clears} / ${r.plays}</dd></dl>
+      <button class="btn primary" type="button" data-diff="${i}">${D.name} 시작</button>
+    </div>`;
+  }).join('');
+  const g = $('garage'); g.innerHTML = '';
+  for (const type of ORDER) {
+    const d = TOWERS[type], own = isUnlocked(type);
+    const c = document.createElement('div'); c.className = 'gcard' + (own ? '' : ' locked');
+    c.innerHTML = `<canvas width="96" height="96" aria-hidden="true"></canvas><div><div class="nm">${d.name} <span class="dlv">${d.cost} 금화</span></div><div class="ds">${d.desc}</div><div class="act">` +
+      (own ? '<span class="owned">보유</span>' : `<button class="btn sm ${prog.ap >= d.ap ? 'primary' : ''}" type="button" data-unlock="${type}" ${prog.ap >= d.ap ? '' : 'disabled'}>🔒 ${d.ap} AP로 해제</button>`) + '</div></div>';
+    const cx = c.querySelector('canvas').getContext('2d'); cx.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(cx, type, 30, 32, 1, -.7);
+    g.appendChild(c);
+  }
+}
+$('diffs').addEventListener('click', e => { const b = e.target.closest('[data-diff]'); if (b) startGame(+b.dataset.diff); });
+$('garage').addEventListener('click', e => {
+  const b = e.target.closest('[data-unlock]'); if (!b) return;
+  const type = b.dataset.unlock, cost = TOWERS[type].ap;
+  if (isUnlocked(type) || prog.ap < cost) return;
+  prog.ap -= cost; prog.unlocked.push(type); saveProg(); renderLobby();
+});
 
 function tileAt(ev) {
   const r = cv.getBoundingClientRect();
@@ -879,6 +1009,7 @@ cv.addEventListener('click', e => {
 });
 cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel = null; });
 window.addEventListener('keydown', e => {
+  if (inLobby) return;
   if (e.target.closest && e.target.closest('input')) return;
   const n = parseInt(e.key, 10);
   if (chatT) {
@@ -1038,7 +1169,7 @@ function avatarCanvas(type, size) {
 function initChat(t) { t.log = []; t.unread = 0; t.trigger = rollTrigger(); t.misses = 0; t.cool = false; t.pending = null; t.busy = false; }
 function greet(t) {
   for (const line of PERSONA[t.type].hi) logThem(t, line);
-  ding(); floatText(t.x, t.y - 30, '💬 새 메시지', '#fee500');
+  ding(); floatText(t.x, t.y - 30, '📻 무전 수신', '#e2b54a');
 }
 function msgEl(t, m, prev) {
   if (m.who === 'me') {
@@ -1077,7 +1208,8 @@ function openChat(t) {
   chatT = t; t.unread = 0;
   const head = $('chatAvatar').getContext('2d'); head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76); head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawTower(head, t.type, 30, 30, 1, -.7);
   $('chatName').textContent = TOWERS[t.type].name;
-  chatBody.innerHTML = `<div class="chat-day">${new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}</div>`;
+  chatEl.style.setProperty('--tc', TOWERS[t.type].color);
+  chatBody.innerHTML = `<div class="chat-day">CH ${String(S.towers.indexOf(t) + 1).padStart(2, '0')} · ${new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>`;
   t.log.forEach((m, i) => chatBody.appendChild(msgEl(t, m, t.log[i - 1])));
   chatEl.hidden = false; scrollDown();
   refreshComposer();
@@ -1106,7 +1238,7 @@ function refreshComposer() {
   }
   const locked = !!p;
   chatInput.disabled = locked; $('chatSend').disabled = locked;
-  chatInput.placeholder = locked ? (p.kind === 'quiz' ? '보기 중에서 정답을 골라 주세요' : '선물을 하나 골라 주세요') : '메시지 입력';
+  chatInput.placeholder = locked ? (p.kind === 'quiz' ? '보기 중에서 정답을 골라 주세요' : '선물을 하나 골라 주세요') : '무전 보내기';
   chatSuggest.innerHTML = '';
   if (!locked) {
     const picks = SUGGEST.slice().sort(() => Math.random() - .5).slice(0, 3);
@@ -1188,21 +1320,23 @@ chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat()
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  if (!paused && !chatT) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
+  if (!paused && !chatT && !inLobby) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
   render(); refreshUI();
   requestAnimationFrame(frame);
 }
 
 function start(data) {
-  reset();
-  if (data && Array.isArray(data.towers) && !data.over) {
+  reset(0);
+  if (data && Array.isArray(data.towers) && !data.over && !data.inLobby) {
+    startGame(data.diff | 0); S.time = data.time || 0;
     S.gold = data.gold; S.lives = data.lives; S.wave = data.wave;
     for (const t of data.towers) { if (!TOWERS[t.type]) continue; S.gold += TOWERS[t.type].cost; place(t.type, t.c, t.r); const p = occ.get(t.c + ',' + t.r); if (p) { p.lv = t.lv; p.invested = t.invested; p.kills = t.kills; p.buff = t.buff || 1; } }
     S.fx = [];
-  }
+  } else showLobby();
   requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
 }
 window.claude?.hot?.snapshot?.(() => ({
+  inLobby, diff: S.diff, time: S.time,
   gold: S.gold, lives: S.lives, wave: S.waveActive ? S.wave - 1 : S.wave, over: S.over,
   towers: S.towers.map(t => ({ type: t.type, c: t.c, r: t.r, lv: t.lv, invested: t.invested, kills: t.kills, buff: t.buff || 1 })),
 }));
