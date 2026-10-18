@@ -1611,30 +1611,287 @@ function nextWaveLine() {
   for (const q of buildWave(w)) c[q.type] = (c[q.type] || 0) + 1;
   return `웨이브 ${w}: ` + Object.entries(c).map(([k, n]) => `${ENEMIES[k].name} ${n}대`).join(', ') + (w % 10 === 0 ? ' — 보스 웨이브예요!' : '');
 }
-const TALK = [
-  { k: ['안녕', '하이', 'ㅎㅇ', '반가', 'hello', 'hi'], r: () => pick(['안녕! 😊', '반가워요! 오늘 기분 어때요?', '네 안녕하세요~']) },
-  { k: ['누구', '이름', '소개'], r: P => P.me },
-  { k: ['배고', '밥', '먹', '간식', '음식'], r: P => P.food },
-  { k: ['취미', '좋아하는'], r: P => P.hobby },
-  { k: ['꿈'], r: P => P.dream },
-  { k: ['몇살', '나이'], r: P => P.age },
-  { k: ['상황', '현황', '상태', '어떻게돼', '몇웨이브', '금화', '시간'], r: () => statusLine() },
-  { k: ['다음웨이브', '다음엔', '뭐가와', '뭐나와'], r: () => nextWaveLine() },
-  { k: ['팁', '추천', '도움', '어떻게해', '공략', '힌트줘'], r: () => pick(TIPS) },
-  { k: ['업적', '포인트', 'ap'], r: () => `업적 포인트는 지금 ${prog.ap} AP예요.` },
-  { k: ['맵'], r: () => inLobby ? '맵은 5종이고 판마다 무작위로 나와요.' : `이번 맵은 ${MAP.name}, 길이 ${Math.round(MAP.len / T)}칸이에요.` },
-  { k: ['고마', '감사', '땡큐'], r: () => pick(['에이 뭘요 ㅎㅎ', '천만에요!']) },
-  { k: ['잘했', '최고', '멋져', '짱', '대단', '잘한다'], r: () => pick(['헤헤 칭찬 들으니까 힘이 나요 😆', '같이 잘하고 있는 거죠!']) },
-  { k: ['피곤', '졸려', '잠와', '자고'], r: () => pick(['조금만 쉬어요. 게임은 기다려 주지 않지만요 ㅎㅎ', '졸리면 스트레칭 한 번!']) },
-  { k: ['심심'], r: () => pick(['그럼 나랑 수다 떨자!', '아무 얘기나 해 봐요!']) },
-  { k: ['날씨', '덥', '춥'], r: () => pick(['오늘 협곡에 바람이 꽤 불어요 🍃', '그래도 성문 안은 따뜻해요']) },
-  { k: ['적', '웨이브', '검은', '싸움', '전투'], r: () => statusLine() },
-  { k: ['ㅋㅋ', 'ㅎㅎ', '웃겨'], r: () => pick(['ㅋㅋㅋ 나도 웃겨', '😂😂']) },
-  { k: ['사랑해', '너좋아해', '네가좋아', '너가좋아'], r: () => pick(['어머… 나도 💛', '부끄럽게 왜 그래 ㅎㅎ']) },
-  { k: ['기분', '어때', '잘지내', '괜찮'], r: () => pick(['기분 최고예요!', '나쁘지 않아요. 당신은요?']) },
+// ---------- conversation engine ----------
+// 규칙 기반 대화. 의도 파악 → 인물별 대사 → 앞 대화 맥락(상대가 던진 질문, 유저 이름)을 반영합니다.
+// 같은 대사는 최근 8개 안에서 다시 고르지 않고, 모르는 말은 핵심 단어를 짚어 되묻습니다.
+const YOU = { haru: '너', doyun: '지휘관님', mio: '집사', prof: '자네', r7: '사용자' };
+const YOU_NAMED = { haru: n => n, doyun: n => `${n} 지휘관님`, mio: n => `${n} 집사`, prof: n => `${n} 씨`, r7: n => `${n} 님` };
+const B = {
+  greet: {
+    haru: ['안녕! {you} 왔구나 😆 오늘 하루 어땠어?', '하이하이~ 기다리고 있었어!', '왔다 왔다! 오늘은 무슨 얘기 할까?'],
+    doyun: ['안녕하십니까, {you}. 오늘도 협곡은 조용합니다.', '반갑습니다, {you}. 무엇이든 말씀하십시오.'],
+    mio: ['냐옹~ {you} 왔다냥! 쓰다듬어 줘', '오 {you}! 마침 심심했다냥'],
+    prof: ['오, 왔는가 {you}. 오늘은 무슨 얘기를 해 볼까?', '어서 오게. 차 한잔하면서 이야기하세.'],
+    r7: ['삐빅. {you} 접속 확인. 반갑습니다.', '인사 수신. 오늘의 기분을 입력해 주세요.'] },
+  bye: {
+    haru: ['벌써 가? 또 와야 해! 👋', '응 잘 가~ 내일 또 수다 떨자!'],
+    doyun: ['알겠습니다. 언제든 다시 불러 주십시오.', '수고하셨습니다, {you}.'],
+    mio: ['가지 마라냥… 금방 와야 한다냥', '잘 가라냥. 츄르 사 오면 더 좋고'],
+    prof: ['그래, 조심히 가게. 오늘 대화 즐거웠네.', '다음에 또 오게나.'],
+    r7: ['삐빅. 재접속을 기다리겠습니다.', '안녕히 가세요. 대기 모드로 전환합니다.'] },
+  howru: {
+    haru: ['나야 완전 좋지! {you:랑} 얘기하니까 더 좋아 ㅎㅎ', '음… 솔직히 좀 졸렸는데 {you:가} 오니까 깼어!'],
+    doyun: ['저는 평소처럼 차분합니다. {you:는} 어떠십니까?', '나쁘지 않습니다. 전황만 좋으면 더 좋겠지요.'],
+    mio: ['햇볕 쬐고 있어서 기분 최고다냥', '배만 부르면 언제나 좋다냥. {you:는}?'],
+    prof: ['허허, 이 나이에 이 정도면 아주 좋은 편이지. 자네는?', '연구가 잘 풀려서 기분이 좋다네.'],
+    r7: ['시스템 상태 양호. 배터리 87%.', '오류 없음. 기분이라는 개념은 아직 학습 중입니다.'] },
+  feelGood: {
+    haru: ['오 좋은 일 있었어? 나도 같이 신난다 🎉', '헤헤 {you} 기분 좋으면 나도 좋아!'],
+    doyun: ['좋은 소식이군요. 그 기세로 방어전도 이겨 봅시다.', '다행입니다. 좋은 컨디션은 좋은 판단을 만듭니다.'],
+    mio: ['기분 좋으면 골골송 불러 준다냥 ~골골~', '좋겠다냥! 나한테도 좀 나눠 달라냥'],
+    prof: ['허허, 좋은 일이군. 기쁨은 나눌수록 커지는 법이지.', '그 기분 오래 간직하게.'],
+    r7: ['긍정 감정 감지. 저장했습니다 😊', '좋은 데이터입니다. 그 상태를 유지하세요.'] },
+  feelBad: {
+    haru: ['헉 무슨 일 있었어? 얘기해 봐, 다 들어줄게', '오늘 좀 힘들었구나… 토닥토닥 🫂'],
+    doyun: ['힘든 날도 있습니다. 잠깐 쉬어 가도 괜찮습니다.', '무리하지 마십시오. 전투는 기다려 줍니다.'],
+    mio: ['힘들면 내 배 만져도 된다냥. 특별히 허락함', '옆에서 꾹꾹이 해 줄게냥…'],
+    prof: ['저런… 마음이 지칠 땐 따뜻한 걸 마시고 푹 자는 게 최고라네.', '살다 보면 그런 날도 있지. 내일은 나을 걸세.'],
+    r7: ['부정 감정 감지. 위로 프로토콜 실행: 괜찮아요.', '휴식을 권장합니다. 물 한 잔도 추천합니다.'] },
+  thanks: {
+    haru: ['에이 뭘~ 우리 사이에 ㅎㅎ', '고맙긴! 나도 고마워'],
+    doyun: ['별말씀을요. 제 임무입니다.', '천만에요, {you}.'],
+    mio: ['고마우면 츄르로 갚아라냥', '흥, 당연한 거다냥 (꼬리 살랑)'],
+    prof: ['허허, 고맙긴. 자네가 잘 들어 주니 나도 좋네.', '별것 아닐세.'],
+    r7: ['감사 수신. 호감도 상승 처리 중.', '천만에요. 도움이 되어 기쁩니다 (추정).'] },
+  praise: {
+    haru: ['헤헤 진짜? 부끄럽다 😳', '칭찬 들으니까 날아갈 것 같아!'],
+    doyun: ['과찬이십니다. 그래도… 감사합니다.', '칭찬은 사기를 올리지요. 감사합니다.'],
+    mio: ['당연하다냥. 나는 원래 귀엽다냥 😼', '더 칭찬해라냥. 골골골'],
+    prof: ['허허, 늙은이를 너무 띄우지 말게.', '자네 보는 눈이 있군!'],
+    r7: ['칭찬 감지. 냉각 팬 회전 속도 증가.', '감사합니다. 자존감 모듈 +1.'] },
+  insult: {
+    haru: ['힝… 그렇게 말하면 서운해 🥺', '앗 내가 뭐 잘못했어? 말해 주면 고칠게!'],
+    doyun: ['… 알겠습니다. 부족한 점은 보완하겠습니다.', '피드백 감사합니다. 더 노력하겠습니다.'],
+    mio: ['하악! 할퀴어 버린다냥 😾', '흥, 삐졌다냥. 츄르 주면 풀어 줌'],
+    prof: ['허허, 젊은이가 성격이 급하군.', '쓴소리도 약이 되지. 받아들이겠네.'],
+    r7: ['부정 입력 감지. 상처받지 않았습니다… 아마도.', '오류 보고서에 기록했습니다.'] },
+  love: {
+    haru: ['어머… 나도 {you} 좋아 💛', '갑자기?! 심쿵했잖아 ㅎㅎ'],
+    doyun: ['…업무 중입니다만, 기쁘군요.', '그 말씀, 큰 힘이 됩니다.'],
+    mio: ['나도 {you} 좋다냥. 밥 주니까', '부비부비~ 나도다냥'],
+    prof: ['허허, 이 나이에 그런 말을 듣다니 고맙네.', '자네도 참 따뜻한 사람이군.'],
+    r7: ['사랑: 정의 검색 중… 결과: 좋은 것. 저도요.', '호감 신호 감지. 회로가 따뜻해집니다.'] },
+  skill: {
+    haru: ['나? 게임은 좀 하지~ 근데 {you}만큼은 아니야 ㅎㅎ', '실력은 비밀! 같이 하면 알게 될걸?'],
+    doyun: ['전술 분석이라면 자신 있습니다. 실전은 {you} 몫이지요.', '작전 짜는 건 제 전문입니다.'],
+    mio: ['고양이 펀치는 세계 최강이다냥 🐾', '사냥 실력은 만렙이다냥'],
+    prof: ['퀴즈라면 내가 한 수 위지. 게임은… 허허', '상식 대결이라면 언제든 받아 주지.'],
+    r7: ['연산 속도 초당 10억 회. 실력: 상위 1%로 추정.', '반응 속도 0.001초. 겸손 모듈은 미설치.'] },
+  gameOpinion: {
+    haru: ['완전 잘될 것 같아! 나 같으면 친구들한테 다 추천할 거야 ㅎㅎ', '대화 상대랑 수다 떠는 디펜스 게임, 흔치 않잖아!'],
+    doyun: ['냉정하게 보면, 맵과 난이도 구성이 탄탄합니다. 밸런스를 다듬으면 승산 있습니다.', '테스터 의견을 모아 밸런스를 맞추는 게 다음 단계입니다.'],
+    mio: ['나 나오는 게임이면 무조건 대박이다냥', '고양이가 나오면 다 팔린다냥. 진리다냥'],
+    prof: ['허허, 좋은 게임은 결국 사람들이 알아보는 법이지.', '재미와 배움이 같이 있으니 가능성이 있다고 보네.'],
+    r7: ['판매 예측: 데이터 부족. 그러나 저는 재밌다고 판단합니다.', '성공 확률 계산 중… 긍정적입니다.'] },
+  joke: {
+    haru: ['왕이 넘어지면? 킹콩! ㅋㅋㅋ', '세상에서 제일 가난한 왕은? 최저임금! ㅋㅋ'],
+    doyun: ['…작전 회의 때 아무도 안 웃은 농담입니다. 소가 웃으면? 우하하. …죄송합니다.', '농담은 제 전문이 아닙니다만, 오리가 얼면? 언덕입니다.'],
+    mio: ['고양이가 제일 좋아하는 차는? 냥차! 냐하하', '개가 사람을 가르치면? 개인지도다냥 ㅋ'],
+    prof: ['허허, 바나나가 웃으면? 바나나킥이지!', '물고기 중 가장 학식이 높은 건? 고등어라네. 허허'],
+    r7: ['농담 실행: 로봇이 좋아하는 음악은? 헤비 메탈.', '컴퓨터가 추운 이유는? 윈도우를 열어 둬서. 삐빅.'] },
+  laugh: {
+    haru: ['ㅋㅋㅋㅋ 뭐야 왜 웃어, 나도 웃겨', '{you} 웃으니까 나도 기분 좋다 ㅎㅎ'],
+    doyun: ['웃음은 좋은 신호입니다.', '…저도 모르게 미소가 나오는군요.'],
+    mio: ['냐하하 {you} 웃는 거 귀엽다냥', '뭐가 웃기냥? 나도 알려 줘'],
+    prof: ['허허허, 웃음은 만병통치약이지.', '자네 웃음소리가 듣기 좋군.'],
+    r7: ['웃음 감지. 따라 해 봅니다: 하. 하. 하.', '유머 반응 기록 완료.'] },
+  bored: {
+    haru: ['그럼 나랑 수다 떨자! 요즘 재밌는 거 뭐 있어?', '심심할 땐 게임 한 판 ㄱㄱ! 아님 나랑 얘기하든가 ㅎㅎ'],
+    doyun: ['그렇다면 새 난이도에 도전해 보시는 건 어떻습니까?', '장애물을 치우고 새 전략을 짜 보는 것도 방법입니다.'],
+    mio: ['그럼 나랑 레이저 포인터 놀이하자냥!', '상자 하나만 주면 안 심심하다냥'],
+    prof: ['그럴 땐 퀴즈가 최고지. 나랑 수다 떨다 보면 문제가 생각날지도 모르네.', '책 한 권 읽어 보는 건 어떤가?'],
+    r7: ['심심함 감지. 추천 활동: 게임 시작.', '대화를 계속하기를 추천합니다.'] },
+  agree: {
+    haru: ['그치그치!', '역시 {you:랑} 나랑 잘 맞아 ㅎㅎ'],
+    doyun: ['알겠습니다.', '좋습니다, {you}.'],
+    mio: ['응 그렇다냥', '냥!'],
+    prof: ['그렇지, 그렇고말고.', '음, 좋네.'],
+    r7: ['확인.', '긍정 응답 기록.'] },
+  disagree: {
+    haru: ['앗 아니야? 그럼 뭔데 뭔데?', '헉 내가 잘못 알았나 봐 ㅎㅎ'],
+    doyun: ['알겠습니다. 정정하겠습니다.', '그렇군요. 다르게 생각해 보겠습니다.'],
+    mio: ['흥, 아니면 말고다냥', '냥? 그럼 뭐냥'],
+    prof: ['허허, 내가 틀렸나 보군.', '그렇다면 자네 생각을 듣고 싶네.'],
+    r7: ['부정 응답 기록. 가설을 수정합니다.', '이해했습니다. 정정합니다.'] },
+  unknownQ: {
+    haru: ['음… 그건 나도 잘 모르겠어! {you:는} 어떻게 생각해?', '오 어려운 질문이다 ㅋㅋ 같이 생각해 보자!'],
+    doyun: ['정확한 답을 드리긴 어렵습니다. {you} 생각은 어떠십니까?', '그 부분은 정보가 부족합니다. 조금 더 말씀해 주시겠습니까?'],
+    mio: ['몰라냥. 고양이는 그런 거 신경 안 쓴다냥', '음… 그건 {you:가} 알려 줘라냥'],
+    prof: ['흠, 좋은 질문이군. 자네는 어떻게 생각하나?', '그건 나도 더 연구해 봐야겠네.'],
+    r7: ['질문 분석 실패. 다르게 표현해 주세요.', '데이터베이스에 해당 정보가 없습니다.'] },
+  echoNoun: {
+    haru: ['{x}? 갑자기 {x:가} 왜? ㅎㅎ 좋아해?', '{x}! 나도 그거 알아 ㅎㅎ 무슨 일 있었어?'],
+    doyun: ['{x} 말씀이십니까? 어떤 뜻인지 여쭤봐도 되겠습니까?', '{x}… 무슨 일과 관련된 것입니까?'],
+    mio: ['{x}? 냄새 맡아 봐도 되냥?', '{x:는} 맛있는 거냥?'],
+    prof: ['{x:라}… 무슨 이야기를 하려는 건가?', '{x:라}, 그 단어에도 재밌는 유래가 있지.'],
+    r7: ['단어 "{x}" 수신. 문맥 정보가 더 필요합니다.', '"{x}" 인식. 이어서 입력해 주세요.'] },
+  echo: {
+    haru: ['오 {x}? 그거 얘기 더 해 줘!', '{x:라니} 재밌다 ㅎㅎ 그래서 어떻게 됐어?', '{x} 얘기구나! 나 그런 거 듣는 거 좋아해'],
+    doyun: ['{x}에 대해 말씀하셨군요. 조금 더 설명해 주시겠습니까?', '흥미롭군요. {x}, 기억해 두겠습니다.'],
+    mio: ['{x}? 그거 먹는 거냥?', '흐음 {x}… 그것보다 나 쓰다듬어 달라냥', '{x} 얘기는 재밌다냥. 더 해 봐라냥'],
+    prof: ['{x:라}… 흥미로운 주제로군. 더 들려주게.', '오, {x}에 대해선 할 말이 많지. 자네 생각부터 듣고 싶네.'],
+    r7: ['키워드 "{x}" 저장. 추가 정보를 요청합니다.', '"{x}" 분석 중… 흥미로운 입력입니다.'] },
+  nameLearn: {
+    haru: ['{n}! 예쁜 이름이다. 앞으로 그렇게 부를게 ㅎㅎ'], doyun: ['{n} 지휘관님, 기억하겠습니다.'],
+    mio: ['{n} 집사냥. 외웠다냥'], prof: ['{n} 씨라… 좋은 이름이로군. 기억해 두지.'], r7: ['사용자 이름 = {n}. 저장 완료.'] },
+  nameRecall: {
+    haru: ['당연히 기억하지! {n:잖아} ㅎㅎ'], doyun: ['{n} 지휘관님이십니다.'], mio: ['{n} 집사다냥. 까먹을 리가'],
+    prof: ['{n} 씨 아닌가. 늙었어도 그 정도는 기억하네.'], r7: ['저장된 이름: {n}.'] },
+  nameUnknown: {
+    haru: ['아직 이름 안 알려 줬잖아! 뭐야, 알려 줘 ㅎㅎ'], doyun: ['아직 성함을 듣지 못했습니다. 알려 주시겠습니까?'],
+    mio: ['이름 모른다냥. 알려 주면 외워 줄게'], prof: ['아직 자네 이름을 못 들었네. 알려 주겠나?'], r7: ['이름 데이터 없음. 입력해 주세요.'] },
+};
+// 대화 상대가 되묻는 질문. 유저가 답하면 그 주제로 받아 줍니다.
+const ASK = {
+  food: { haru: '근데 {you:는} 뭐 좋아해? 음식!', doyun: '{you:는} 어떤 음식을 좋아하십니까?', mio: '{you:는} 뭐 먹냥? 나도 줘라냥', prof: '자네는 무슨 음식을 즐기나?', r7: '사용자의 선호 음식을 입력해 주세요.' },
+  fun: { haru: '요즘 {you:는} 뭐가 제일 재밌어?', doyun: '요즘 즐기시는 일이 있으십니까?', mio: '요즘 {you:는} 뭐 하고 노냥?', prof: '요즘 자네는 무엇에 빠져 있나?', r7: '최근 관심사를 입력해 주세요.' },
+  weapon: { haru: '{you:는} 어떤 무기가 제일 좋아?', doyun: '가장 신뢰하시는 무기는 무엇입니까?', mio: '{you:는} 어떤 무기가 좋냥?', prof: '자네가 아끼는 무기는 뭔가?', r7: '선호 무기를 입력해 주세요.' },
+  feel: { haru: '오늘 {you} 기분은 어때?', doyun: '오늘 컨디션은 어떠십니까?', mio: '오늘 {you} 기분 어떠냥?', prof: '오늘 자네 기분은 어떤가?', r7: '오늘의 기분 상태를 입력해 주세요.' },
+  name: { haru: '참, 너 이름이 뭐야?', doyun: '실례지만 성함을 여쭤봐도 되겠습니까?', mio: '집사 이름이 뭐냥?', prof: '그러고 보니 자네 이름을 아직 모르는군.', r7: '사용자 이름을 입력해 주세요.' },
+};
+const ACK = {
+  food: { haru: '{x}! 맛있겠다 😋 나도 먹고 싶어', doyun: '{x}, 좋은 선택입니다. 기억해 두겠습니다.', mio: '{x}… 나눠 줄 거지냥?', prof: '{x:라}, 맛과 영양을 다 잡았군.', r7: '선호 음식: {x}. 저장 완료.' },
+  fun: { haru: '{x} 재밌지! 나도 해 보고 싶다', doyun: '{x}, 좋은 기분 전환이 되겠군요.', mio: '{x}보다 낮잠이 더 재밌다냥… 농담이다냥', prof: '{x:라}, 자네는 취향이 확실하군.', r7: '관심사 데이터: {x}. 흥미롭습니다.' },
+  weapon: { haru: '{x} 좋지! 나도 그거 좋아해', doyun: '{x:는} 좋은 선택입니다. 배치 위치가 핵심이지요.', mio: '{x}? 나는 고양이 펀치가 최고다냥', prof: '{x:라}, 고른 이유를 들어 보고 싶군.', r7: '{x} 선호 기록. 전술적으로 합리적입니다.' },
+  feel: { haru: '그렇구나! 얘기해 줘서 고마워 ㅎㅎ', doyun: '말씀해 주셔서 감사합니다.', mio: '그렇냥. 알겠다냥', prof: '그렇군, 솔직하게 말해 줘서 고맙네.', r7: '기분 상태 기록 완료.' },
+};
+const INTENTS = [
+  ['nameAsk', /내이름(이|은)?(뭐|기억|알아)/],
+  ['nameTell', /(?:내|제)이름은([가-힣a-zA-Z]{1,8})|^(?:나는|난|저는)([가-힣]{2,4})(?:이야|야|이에요|예요|입니다|이라고해|라고해)/],
+  ['bye', /잘가|바이바이|다음에봐|이따봐|나갈게|ㅂㅂ|bye/],
+  ['greet', /^(안녕|하이|ㅎㅇ|반가|hello|hi|헬로|하잉)/],
+  ['status', /상황|현황|전황|몇웨이브|금화얼마|남은시간|성문내구/],
+  ['next', /다음웨이브|다음엔뭐|뭐가와|뭐나와/],
+  ['tips', /팁|추천|공략|힌트줘|어떻게해|막혀|어려워|못깨|도와/],
+  ['ap', /업적|포인트|ap얼마/],
+  ['map', /맵|지도/],
+  ['gameOpinion', /게임.*(팔리|재밌|어때|평가|대박|망하|인기|성공)|팔리겠|대박날|성공할|망할까/],
+  ['skill', /좀치|잘해|잘하냐|잘하니|잘함|실력|고수|게임좀/],
+  ['joke', /농담|개그|웃긴(얘기|거|말)|재밌는얘기|웃겨줘/],
+  ['love', /사랑해|너좋아해|널좋아|네가좋아|너가좋아/],
+  ['praise', /귀여|예쁘|이쁘|멋지|멋져|최고야|잘했|똑똑|천재|짱이|짱!|짱$/],
+  ['insult', /바보|멍청|싫어|별로야|노잼|재미없|못생|짜증나게/],
+  ['thanks', /고마|감사|땡큐|thx|thank/],
+  ['howru', /기분어때|잘지내|컨디션|요즘어때|넌어때|너는어때|괜찮아\?/],
+  ['feelBad', /슬퍼|슬프|우울|힘들|짜증|화나|속상|지쳤|피곤|졸려|외로|아파|망했/],
+  ['feelGood', /행복|신나|기뻐|기분좋|좋았|재밌었|최고였|이겼|클리어했/],
+  ['bored', /심심|지루/],
+  ['whoami', /누구|넌뭐야|정체|자기소개|소개해/],
+  ['food', /배고|밥|먹|간식|음식|맛있|배불/],
+  ['hobby', /취미|좋아하는(거|게|것)|뭐좋아/],
+  ['dream', /꿈/],
+  ['age', /몇살|나이/],
+  ['time', /몇시|지금시간/],
+  ['weather', /날씨|비와|비온|더워|추워|덥|춥|눈와/],
+  ['laugh', /^(ㅋ|ㅎ|하하|헤헤|크크|푸하)+/],
+  ['agree', /^(응|어|ㅇㅇ|그래|맞아|네|넹|웅|ㅇㅋ|오케이|좋아|당연)[.!~]*$/],
+  ['disagree', /^(아니|ㄴㄴ|노|아냐|별로)[.!~]*$/],
+  ['youQ', /^(너는|넌|당신은|자네는|너도)\??$/],
 ];
-const FALLBACK = ['오 그렇구나!', '진짜요? 더 얘기해 줘요', '음… 그건 잘 모르겠어요 😅', '그 얘기 재밌네요 ㅎㅎ', '헉 그래요?'];
-const FOLLOW = ['근데 좋아하는 음식 뭐예요?', '요즘 뭐가 제일 재밌어요?', '주말엔 보통 뭐 해요?', '어떤 무기가 제일 좋아요?'];
+const WEAPON_RE = /새총|느림보|소형대포|빽총|대형대포|빙결|강력새총/;
+const STOP = new Set(['나', '너', '저', '오늘', '어제', '내일', '요즘', '아까', '지금', '그냥', '진짜', '정말', '좀', '너무', '완전', '근데', '그래서', '그리고', '이거', '그거', '저거', '여기', '거기', '뭐', '왜', '어떻게', '언제', '어디', '친구랑']);
+const VERBISH = /(어|아|다|요|지|네|까|래|자|했|함|음|임|더라|던데|는데)$/;
+function keyword(text) {
+  const toks = text.replace(/[?!.,~…ㅋㅎ]+/g, ' ').split(/\s+/).filter(Boolean);
+  const cands = [];
+  for (let w of toks) {
+    w = w.replace(/(이었어|였어|이에요|예요|이야|에서|으로|이랑|하고|까지|부터|처럼|보다)$/, '');
+    if (w.length >= 3) w = w.replace(/(은|는|을|를|랑|도|에|로|의)$/, '');
+    if (w.length >= 2 && !STOP.has(w) && !(VERBISH.test(w) && toks.length > 1)) cands.push(w);
+  }
+  return (cands[cands.length - 1] || '').slice(0, 10);
+}
+const cleanName = s => s.replace(/(이야|야|이에요|예요|입니다|이라고해|라고해|이고|임|이요|요)$/, '').replace(/[^가-힣a-zA-Z]/g, '').slice(0, 8);
+const hasBatchim = w => { const ch = w.charCodeAt(w.length - 1); return ch >= 0xAC00 && ch <= 0xD7A3 && (ch - 0xAC00) % 28 !== 0; };
+const JOSA = { 랑: ['이랑', '랑'], 는: ['은', '는'], 가: ['이', '가'], 를: ['을', '를'], 라니: ['이라니', '라니'], 라: ['이라', '라'], 잖아: ['이잖아', '잖아'] };
+const withJosa = (w, j) => w + (j ? JOSA[j][hasBatchim(w) ? 0 : 1] : '');
+const isQuestion = (raw, norm) => /\?$/.test(raw.trim()) || /(니|나요|까|냐|어때|뭐야|뭐해|왜|어떻게|언제|어디|누구|몇)$/.test(norm.replace(/[?!.~]+$/, ''));
+function fill(c, s, extra = {}) {
+  const id = c.P.id, n = c.facts.name;
+  const val = { you: n ? YOU_NAMED[id](n) : YOU[id], n: n || '', x: extra.x || '그거' };
+  return s.replace(/\{(you|n|x)(?::([가-힣]+))?\}/g, (_, k, j) => withJosa(val[k], j));
+}
+function fresh(c, arr) {
+  const pool = arr.filter(l => !c.recentLines.includes(l));
+  const l = pick(pool.length ? pool : arr);
+  c.recentLines = [l, ...c.recentLines].slice(0, 8);
+  return l;
+}
+const bank = (c, intent) => B[intent] && B[intent][c.P.id];
+function askBack(c) {
+  const order = ['food', 'fun', 'weapon', 'feel'].filter(t => !c.asked.includes(t));
+  if (!c.facts.name && !c.asked.includes('name')) order.unshift('name');
+  const t = order[0] || pick(['food', 'fun', 'weapon', 'feel']);
+  c.asked.push(t); c.lastAsk = t;
+  return fill(c, ASK[t][c.P.id]);
+}
+// 메시지 하나에 대한 답장들(문자열 배열)과 파악한 의도를 돌려줍니다.
+function compose(c, text, norm) {
+  const P = c.P, out = [], q = isQuestion(text, norm);
+  c.facts = c.facts || {}; c.recentLines = c.recentLines || []; c.asked = c.asked || [];
+  let intent = null, m = null;
+  for (const [name, re] of INTENTS) { m = norm.match(re); if (m) { intent = name; break; } }
+  if (!intent && WEAPON_RE.test(norm)) intent = 'weapon';
+  const lastAsk = c.lastAsk; c.lastAsk = null;
+  // 직전에 상대가 물어본 것에 대한 대답이면 그 주제로 받아 줍니다.
+  const MATCH = { food: ['food'], weapon: ['weapon'], fun: ['hobby', 'feelGood'], feel: ['feelGood', 'feelBad', 'howru'], name: [] };
+  if (lastAsk && !q && (!intent || intent === 'agree' || MATCH[lastAsk].includes(intent))) {
+    if (lastAsk === 'name' && !intent) {
+      c.facts.name = cleanName(keyword(text) || text.trim()); out.push(fill(c, bank(c, 'nameLearn')[0]));
+      return { lines: out, intent: 'nameTell' };
+    }
+    if (lastAsk === 'feel' && (intent === 'feelGood' || intent === 'feelBad')) { /* 아래 감정 대사로 */ }
+    else if (lastAsk !== 'name') {
+      const wk = ORDER.find(k => norm.includes(TOWERS[k].name.replace(/\s+/g, '')));
+      const x = (lastAsk === 'weapon' && wk ? TOWERS[wk].name : keyword(text)) || text.trim().slice(0, 10);
+      c.facts[lastAsk] = x;
+      out.push(fill(c, ACK[lastAsk][P.id], { x }));
+      if (Math.random() < .5) out.push(fill(c, askBack(c)));
+      return { lines: out, intent: 'answer' };
+    }
+  }
+  switch (intent) {
+    case 'nameTell': { c.facts.name = cleanName(m[1] || m[2]); out.push(fill(c, bank(c, 'nameLearn')[0])); break; }
+    case 'nameAsk': out.push(fill(c, (c.facts.name ? bank(c, 'nameRecall') : bank(c, 'nameUnknown'))[0])); if (!c.facts.name) { c.lastAsk = 'name'; c.asked.push('name'); } break;
+    case 'status': out.push(voice(P, statusLine())); break;
+    case 'next': out.push(voice(P, nextWaveLine())); break;
+    case 'tips': out.push(voice(P, pick(TIPS))); break;
+    case 'ap': out.push(voice(P, `업적 포인트는 지금 ${prog.ap} AP예요.`)); break;
+    case 'map': out.push(voice(P, inLobby ? '맵은 5종이고 판마다 무작위로 나와요.' : `이번 맵은 ${MAP.name}, 길이 ${Math.round(MAP.len / T)}칸이에요.`)); break;
+    case 'time': out.push(voice(P, `지금은 ${clock()}이에요.`)); break;
+    case 'weather': out.push(voice(P, pick(['오늘 협곡에 바람이 꽤 불어요 🍃', '성문 쪽은 해가 잘 들어서 따뜻해요', '비가 오면 웅덩이가 더 커지려나요?']))); break;
+    case 'whoami': out.push(P.me); if (Math.random() < .5) out.push(askBack(c)); break;
+    case 'food': case 'hobby': case 'dream': case 'age': {
+      const facts = { food: P.food, hobby: P.hobby, dream: P.dream, age: P.age };
+      out.push(facts[intent]);
+      if (intent === 'food' && !c.asked.includes('food')) out.push(askBack(c));
+      break;
+    }
+    case 'weapon': {
+      const key = ORDER.find(k => norm.includes(TOWERS[k].name.replace(/\s+/g, '')));
+      if (key) { c.facts.weapon = TOWERS[key].name; out.push(fill(c, ACK.weapon[P.id], { x: TOWERS[key].name })); out.push(voice(P, TOWERS[key].desc)); }
+      break;
+    }
+    case 'youQ': {
+      const t = c.lastTopic || 'howru';
+      const facts = { food: P.food, hobby: P.hobby, fun: P.hobby, dream: P.dream, age: P.age, weapon: null };
+      out.push(facts[t] || fill(c, fresh(c, bank(c, 'howru'))));
+      break;
+    }
+    case null: break;
+    default: { const arr = bank(c, intent); if (arr) out.push(fill(c, fresh(c, arr))); }
+  }
+  if (!out.length) {
+    const x = keyword(text);
+    if (q) out.push(fill(c, fresh(c, bank(c, 'unknownQ'))));
+    else if (x) out.push(fill(c, fresh(c, bank(c, text.trim().split(/\s+/).length === 1 ? 'echoNoun' : 'echo')), { x }));
+    else out.push(fill(c, fresh(c, bank(c, 'agree'))));
+    if (Math.random() < .35) out.push(askBack(c));
+  } else if (['greet', 'agree', 'laugh', 'thanks', 'praise', 'feelGood'].includes(intent) && Math.random() < .4) out.push(askBack(c));
+  if (intent && !['agree', 'disagree', 'laugh', 'youQ'].includes(intent)) c.lastTopic = intent;
+  return { lines: out, intent };
+}
+
 // 퀴즈 트리거: 대화 상대마다 무작위로 하나씩 숨겨 둡니다. 단어일 수도, 질문일 수도 있습니다.
 const TRIGGERS = [
   { label: '피자', re: /피자/, hint: '요즘 이상하게 동그랗고 치즈 쭉 늘어나는 음식이 땡겨요 🍕' },
@@ -1666,11 +1923,11 @@ function gainAff(c, amt) {
   prog.aff[c.P.id] = after; saveProg(); updateAffUI();
   return AFF_MILESTONES.find(x => before < x && after >= x);
 }
-function msgAff(c, text, norm, hit) {
+function msgAff(c, text, norm, intent) {
   const now = Date.now();
   let g = .4 + Math.min(.6, text.length / 50);
-  if (hit) g += .5;
-  if (hit && ['누구', '배고', '취미', '꿈', '몇살'].some(k => hit.k.includes(k))) g += .3;
+  if (intent) g += .5;
+  if (['whoami', 'food', 'hobby', 'dream', 'age', 'answer', 'nameTell', 'howru'].includes(intent)) g += .3;
   if (/고마|감사|최고|멋져|짱|좋아해|사랑|귀여|예쁘|잘했|잘한다|대단/.test(norm)) g += .8;
   c.recent = c.recent || [];
   if (c.recent.includes(norm)) g = 0;
@@ -1916,12 +2173,11 @@ async function send(text) {
   } else if (/퀴즈|문제/.test(norm)) {
     await say(c, voice(P, c.cool ? '퀴즈는 다음 웨이브 막고 나서 또 낼게요!' : '퀴즈요? 그냥은 안 내요 😏 수다 떨다 보면 갑자기 생각날지도?'));
   } else {
-    const hit = TALK.find(x => x.k.some(k => norm.includes(k.replace(/\s+/g, ''))));
-    const ms = gainAff(c, msgAff(c, text, norm, hit));
-    await say(c, voice(P, hit ? hit.r(P) : pick(FALLBACK)));
+    const { lines, intent } = compose(c, text, norm);
+    const ms = gainAff(c, msgAff(c, text, norm, intent));
+    for (const l of lines) await say(c, l);
     if (ms) await say(c, voice(P, `우리 호감도가 ${ms}이 됐어요! 💗 ${ms >= ITEM_COST ? '호감도 상점에서 선물을 고를 수 있어요.' : '더 친해지면 선물을 줄게요.'}`), 'gift');
-    if (!hit && Math.random() < .4) await say(c, voice(P, pick(FOLLOW)));
-    if (c.trigger && ++c.misses >= 3) { c.misses = 0; await say(c, voice(P, c.trigger.hint)); }
+    if (c.trigger && ++c.misses >= 6) { c.misses = 0; await say(c, voice(P, c.trigger.hint)); }
   }
   c.busy = false;
   if (chatOpen && curP() === P) refreshComposer();
