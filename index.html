@@ -250,7 +250,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   </header>
 
   <section class="lobby game-lobby" id="lobby" hidden>
-    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나 차고에서 새 차량을 해제합니다. 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
+    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나, 차고에서 새 차량을 해제하거나, 맵의 장애물을 치웁니다(하나에 5 AP). 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
     <div class="section-label">난이도 선택</div>
     <div class="diffs" id="diffs"></div>
     <div class="section-label">패시브 상점 · 업적 포인트로 영구 강화</div>
@@ -365,7 +365,7 @@ function loadProg() {
   let p = null;
   try { p = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
   p = p && typeof p === 'object' ? p : {};
-  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {} };
+  return { ap: p.ap | 0, unlocked: Array.isArray(p.unlocked) ? p.unlocked : ['police', 'fire'], rec: p.rec || {}, cleared: p.cleared && typeof p.cleared === 'object' ? p.cleared : {}, skills: p.skills && typeof p.skills === 'object' ? p.skills : {} };
 }
 const prog = loadProg();
 function saveProg() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(prog)); } catch (e) { /* progress stays for this visit only */ } }
@@ -609,16 +609,103 @@ function drawEnemy(g, e) {
   }
 }
 
+// ---------- obstacles ----------
+// 난이도마다 길 가까이에 차량을 세울 수 없는 장애물이 놓입니다. 업적 포인트로 하나씩 영구히 치울 수 있습니다.
+const CLEAR_COST = 5;
+const OBST_TYPES = {
+  rock:   { name: '바위',        desc: '협곡에서 굴러떨어진 커다란 바위입니다.' },
+  wreck:  { name: '폐차',        desc: '녹슨 채로 버려진 고물 자동차입니다.' },
+  cones:  { name: '공사 구역',    desc: '공사 콘과 차단봉이 칸을 막고 있습니다.' },
+  puddle: { name: '기름 웅덩이',  desc: '미끄러운 기름이 고여 있어 차를 세울 수 없습니다.' },
+  logs:   { name: '통나무 더미',  desc: '베어 놓은 통나무가 쌓여 있습니다.' },
+};
+const OBST_KEYS = Object.keys(OBST_TYPES);
+function obstacleLayout(diff) {
+  const rnd = mulberry32(4049 + diff * 7919), cells = [];
+  for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
+    if (onPath(c, r)) continue;
+    let near = 9;
+    for (const k of PATH) { const [pc, pr] = k.split(',').map(Number); near = Math.min(near, Math.max(Math.abs(pc - c), Math.abs(pr - r))); }
+    if (near <= 2) cells.push([c, r, near]);
+  }
+  // 길에 바로 붙은 좋은 자리를 조금 더 자주 막습니다.
+  cells.sort((a, b) => (a[2] - b[2]) * .6 + (rnd() - .5));
+  const n = 6 + diff * 2, out = [];
+  for (const [c, r] of cells) {
+    if (out.length >= n) break;
+    if (out.some(o => Math.abs(o.c - c) + Math.abs(o.r - r) < 2)) continue;
+    out.push({ c, r, type: OBST_KEYS[Math.floor(rnd() * OBST_KEYS.length)] });
+  }
+  return out;
+}
+const clearedOf = diff => (prog.cleared[DIFFS[diff].id] = prog.cleared[DIFFS[diff].id] || []);
+function buildObstacles(diff) {
+  const m = new Map(), gone = clearedOf(diff);
+  for (const o of obstacleLayout(diff)) { const k = o.c + ',' + o.r; if (!gone.includes(k)) m.set(k, o); }
+  return m;
+}
+function clearObstacle(key) {
+  const o = S.obst.get(key);
+  if (!o || prog.ap < CLEAR_COST) return false;
+  prog.ap -= CLEAR_COST; clearedOf(S.diff).push(key); saveProg();
+  S.obst.delete(key);
+  const x = (o.c + .5) * T, y = (o.r + .5) * T;
+  ring(x, y, 8, 34, '#c2a6ff', .45); sparks(x, y, '#b9a88a', 14); floatText(x, y - 20, '-' + CLEAR_COST + ' AP', '#c2a6ff');
+  return true;
+}
+function drawObstacle(g, o) {
+  const x = (o.c + .5) * T, y = (o.r + .5) * T;
+  g.save(); g.translate(x, y);
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(3, 10, 22, 9, 0, 0, Math.PI * 2); g.fill();
+  if (o.type === 'rock') {
+    g.fillStyle = '#6d6a63'; g.strokeStyle = '#2b2a27'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(-20, 8); g.lineTo(-16, -8); g.lineTo(-4, -17); g.lineTo(12, -13); g.lineTo(20, 0); g.lineTo(16, 12); g.lineTo(-8, 15); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#8f8b82'; g.beginPath(); g.moveTo(-12, -6); g.lineTo(-4, -13); g.lineTo(8, -10); g.lineTo(0, -2); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(2, -2); g.lineTo(6, 8); g.moveTo(6, 8); g.lineTo(13, 6); g.stroke();
+    g.fillStyle = '#5a5751'; circle(g, 22, 12, 5); g.fill(); circle(g, -22, 13, 3.5); g.fill();
+  } else if (o.type === 'wreck') {
+    g.rotate(-.35);
+    g.fillStyle = '#121212'; g.fillRect(-14, -13, 7, 3); g.fillRect(8, 10, 7, 3);
+    g.fillStyle = '#7a4a2a'; g.strokeStyle = '#2a1a10'; g.lineWidth = 1.5; rr(g, -19, -10, 38, 20, 5); g.fill(); g.stroke();
+    g.fillStyle = '#9a6038'; g.fillRect(-6, -10, 14, 20);
+    g.fillStyle = '#3b2a20'; for (const [a, b, r] of [[-12, -4, 3], [-3, 5, 2.5], [11, -5, 3.5], [14, 4, 2]]) { circle(g, a, b, r); g.fill(); }
+    g.strokeStyle = '#c9d6dc'; g.lineWidth = 1; g.beginPath(); g.moveTo(6, -7); g.lineTo(10, 0); g.lineTo(7, 7); g.moveTo(10, 0); g.lineTo(13, -3); g.stroke();
+  } else if (o.type === 'cones') {
+    g.fillStyle = '#e8e2d0'; g.fillRect(-22, -3, 44, 5); g.fillStyle = '#e65a4f'; for (let i = -20; i < 22; i += 10) g.fillRect(i, -3, 5, 5);
+    for (const [cx, cy] of [[-13, 9], [0, -10], [13, 9]]) {
+      g.fillStyle = '#2b2b2b'; g.fillRect(cx - 8, cy + 5, 16, 3);
+      g.fillStyle = '#f28a2e'; g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx + 7, cy + 6); g.lineTo(cx - 7, cy + 6); g.closePath(); g.fill();
+      g.fillStyle = '#f5f0e0'; g.fillRect(cx - 4, cy - 1, 8, 3);
+    }
+  } else if (o.type === 'puddle') {
+    g.fillStyle = '#141614'; g.beginPath(); g.ellipse(0, 2, 23, 15, .2, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1f2522'; g.beginPath(); g.ellipse(-12, -8, 9, 6, 0, 0, Math.PI * 2); g.fill();
+    const sheen = g.createLinearGradient(-14, -6, 14, 10);
+    sheen.addColorStop(0, 'rgba(194,166,255,.35)'); sheen.addColorStop(.5, 'rgba(134,208,238,.3)'); sheen.addColorStop(1, 'rgba(165,212,106,.3)');
+    g.strokeStyle = sheen; g.lineWidth = 3; g.beginPath(); g.ellipse(2, 3, 13, 7, .2, .3, 2.6); g.stroke();
+    g.fillStyle = '#3a3f3a'; rr(g, 12, -16, 9, 12, 2); g.fill(); g.fillStyle = '#6b726b'; g.fillRect(14, -19, 5, 3);
+  } else if (o.type === 'logs') {
+    g.fillStyle = '#5e3c1f'; g.strokeStyle = '#2b1a0c'; g.lineWidth = 1.5;
+    for (const [lx, ly] of [[-12, 8], [0, 8], [12, 8], [-6, -4], [6, -4], [0, -15]]) {
+      circle(g, lx, ly, 7); g.fill(); g.stroke();
+      g.fillStyle = '#c99a5e'; circle(g, lx, ly, 4.5); g.fill(); g.strokeStyle = '#8a6334'; g.lineWidth = 1; circle(g, lx, ly, 2.2); g.stroke();
+      g.fillStyle = '#5e3c1f'; g.strokeStyle = '#2b1a0c'; g.lineWidth = 1.5;
+    }
+  }
+  g.restore();
+}
+
 // ---------- state ----------
-let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true, lockView = null;
+let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true, lockView = null, obsView = null;
 function reset(diff) {
   S = { diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0 };
-  occ = new Map(); build = null; sel = null; paused = false;
+  S.obst = buildObstacles(S.diff);
+  occ = new Map(); build = null; sel = null; paused = false; obsView = null;
   document.getElementById('overlay').hidden = true;
   if (typeof closeChat === 'function') closeChat();
 }
 
-function canPlace(c, r) { return c >= 0 && c < COLS && r >= 0 && r < ROWS && !onPath(c, r) && !occ.has(c + ',' + r); }
+function canPlace(c, r) { return c >= 0 && c < COLS && r >= 0 && r < ROWS && !onPath(c, r) && !occ.has(c + ',' + r) && !S.obst.has(c + ',' + r); }
 function place(type, c, r) {
   const cost = TOWERS[type].cost;
   if (!canPlace(c, r) || S.gold < cost) return false;
@@ -812,6 +899,8 @@ function render() {
     const t = occ.get(hover.c + ',' + hover.r);
     if (!t && canPlace(hover.c, hover.r)) { ctx.fillStyle = 'rgba(235,230,211,.06)'; ctx.fillRect(hover.c * T, hover.r * T, T, T); }
   }
+  for (const o of S.obst.values()) drawObstacle(ctx, o);
+  if (obsView && S.obst.has(obsView)) { const o = S.obst.get(obsView); ctx.strokeStyle = '#c2a6ff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); rr(ctx, o.c * T + 3, o.r * T + 3, T - 6, T - 6, 8); ctx.stroke(); ctx.setLineDash([]); }
   for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
   for (const t of S.towers) if (t.unread > 0) {
     const bx = t.x + 20, by = t.y - 22;
@@ -889,6 +978,7 @@ for (const [i, type] of ORDER.entries()) {
 function toggleBuild(type) {
   if (S.over) return;
   sel = null;
+  obsView = null;
   if (!isUnlocked(type)) { build = null; lockView = lockView === type ? null : type; return; }
   lockView = null; build = build === type ? null : type;
 }
@@ -933,7 +1023,14 @@ function refreshUI() {
   $('pauseBtn').setAttribute('aria-label', paused ? '계속하기' : '일시정지');
 
   let key, html;
-  if (lockView) {
+  if (obsView && S.obst.has(obsView)) {
+    const o = S.obst.get(obsView), od = OBST_TYPES[o.type], can = prog.ap >= CLEAR_COST;
+    key = 'o' + obsView + prog.ap;
+    html = `<h3>${od.name} <span class="lv">장애물</span></h3><p>${od.desc} 이 칸에는 차량을 세울 수 없습니다.</p>
+      <dl class="kv"><dt>제거 비용</dt><dd>${CLEAR_COST} AP</dd><dt>보유 업적 포인트</dt><dd>${prog.ap} AP</dd><dt>이 난이도 남은 장애물</dt><dd>${S.obst.size}개</dd></dl>
+      <p>${can ? '치우면 이 난이도에서는 영구히 사라집니다.' : '업적 포인트가 ' + (CLEAR_COST - prog.ap) + ' 부족합니다.'}</p>
+      <div class="row"><button class="btn primary grow" type="button" data-act="clear" ${can ? '' : 'disabled'}>${CLEAR_COST} AP로 치우기</button><button class="btn" type="button" data-act="cancel">닫기</button></div>`;
+  } else if (lockView) {
     const d = TOWERS[lockView], can = prog.ap >= d.ap;
     key = 'l' + lockView + prog.ap;
     html = `<h3>${d.name} <span class="lv">🔒 잠김</span></h3><p>${d.desc}</p>
@@ -971,7 +1068,8 @@ function refreshUI() {
 $('panel').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act;
-  if (a === 'cancel') { build = null; lockView = null; }
+  if (a === 'cancel') { build = null; lockView = null; obsView = null; }
+  if (a === 'clear' && obsView && clearObstacle(obsView)) obsView = null;
   if (a === 'unlock' && lockView && unlockVehicle(lockView)) { const t = lockView; lockView = null; build = t; }
   if (a === 'up') upgrade(sel);
   if (a === 'sell') sell(sel);
@@ -993,7 +1091,7 @@ $('lobbyBtn').addEventListener('click', () => {
 
 // ---------- lobby ----------
 function showLobby() {
-  inLobby = true; closeChat(); build = null; sel = null; lockView = null; leaveArmed = 0;
+  inLobby = true; closeChat(); build = null; sel = null; lockView = null; obsView = null; leaveArmed = 0;
   $('lobbyBtn').textContent = '로비로 나가기';
   document.querySelector('.app').classList.add('in-lobby');
   $('lobby').hidden = false; renderLobby();
@@ -1021,9 +1119,10 @@ function renderLobby() {
   renderSkills();
   $('diffs').innerHTML = DIFFS.map((D, i) => {
     const r = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
+    const obTotal = obstacleLayout(i).length, obLeft = buildObstacles(i).size;
     return `<div class="dcard" style="--dc:${D.color}">
       <div class="dtop"><span class="dname">${D.name}</span><span class="dlv">단계 ${i + 1}</span></div>
-      <dl class="kv"><dt>적 체력·속도</dt><dd>×${dmult(i).toFixed(2)}</dd><dt>제한 시간</dt><dd>${mmss(D.limit)}</dd><dt>클리어 보상</dt><dd>+${D.ap} AP</dd><dt>최고 기록</dt><dd>${r.best == null ? '—' : mmss(r.best)}</dd><dt>클리어 / 플레이</dt><dd>${r.clears} / ${r.plays}</dd></dl>
+      <dl class="kv"><dt>적 체력·속도</dt><dd>×${dmult(i).toFixed(2)}</dd><dt>제한 시간</dt><dd>${mmss(D.limit)}</dd><dt>클리어 보상</dt><dd>+${D.ap} AP</dd><dt>최고 기록</dt><dd>${r.best == null ? '—' : mmss(r.best)}</dd><dt>클리어 / 플레이</dt><dd>${r.clears} / ${r.plays}</dd><dt>장애물</dt><dd>${obLeft} / ${obTotal}</dd></dl>
       <button class="btn primary" type="button" data-diff="${i}">${D.name} 시작</button>
     </div>`;
   }).join('');
@@ -1065,6 +1164,8 @@ cv.addEventListener('click', e => {
   if (S.over) return;
   const h = tileAt(e); if (!h) return;
   const t = occ.get(h.c + ',' + h.r);
+  obsView = null;
+  if (S.obst.has(h.c + ',' + h.r)) { obsView = h.c + ',' + h.r; build = null; sel = null; return; }
   if (build) {
     if (canPlace(h.c, h.r)) { const type = build; if (place(type, h.c, h.r)) { if (!e.shiftKey) build = null; greet(occ.get(h.c + ',' + h.r)); } }
     else if (t) { sel = t; build = null; }
@@ -1085,7 +1186,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (n >= 1 && n <= ORDER.length) toggleBuild(ORDER[n - 1]);
-  else if (e.key === 'Escape') { build = null; sel = null; lockView = null; }
+  else if (e.key === 'Escape') { build = null; sel = null; lockView = null; obsView = null; }
   else if (e.code === 'Space') { e.preventDefault(); startWave(); }
   else if (e.key === 'u' || e.key === 'U') upgrade(sel);
   else if ((e.key === 'c' || e.key === 'C') && sel) openChat(sel);
