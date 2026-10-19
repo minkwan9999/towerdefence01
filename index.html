@@ -1297,7 +1297,13 @@ function render() {
     ctx.font = '700 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctxText('strokeText', Math.ceil(h.life) + 's', h.x, h.y + 27); ctx.fillStyle = '#ebe6d3'; ctxText('fillText', Math.ceil(h.life) + 's', h.x, h.y + 27);
   }
   if (obsView && S.obst.has(obsView)) { const o = S.obst.get(obsView); ctx.strokeStyle = '#c2a6ff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); rr(ctx, o.c * T + 3, o.r * T + 3, T - 6, T - 6, 8); ctx.stroke(); ctx.setLineDash([]); }
-  for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
+  // 휴대폰에서는 무기를 칸에 꽉 차게 조금 크게 그립니다.
+  const TS = ROT ? 1.15 : 1;
+  for (const t of S.towers) {
+    if (TS !== 1) { ctx.save(); ctx.translate(t.x, t.y); ctx.scale(TS, TS); ctx.translate(-t.x, -t.y); }
+    drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
+    if (TS !== 1) ctx.restore();
+  }
 
   if (sel) { ctx.strokeStyle = '#e2b54a'; ctx.lineWidth = 2; rr(ctx, sel.x - 27, sel.y - 27, 54, 54, 10); ctx.stroke(); }
   const sorted = S.enemies.slice().sort((a, b) => a.y - b.y);
@@ -1621,7 +1627,7 @@ function tileAt(ev) {
   const lx = (ev.clientX - r.left) / r.width * (ROT ? H : W), ly = (ev.clientY - r.top) / r.height * (ROT ? W : H);
   const x = ROT ? ly : lx, y = ROT ? H - lx : ly;
   const c = Math.floor(x / T), row = Math.floor(y / T);
-  return c >= 0 && c < COLS && row >= 0 && row < ROWS ? { c, r: row } : null;
+  return c >= 0 && c < COLS && row >= 0 && row < ROWS ? { c, r: row, x, y } : null;
 }
 cv.addEventListener('pointermove', e => { hover = tileAt(e); });
 cv.addEventListener('pointerdown', e => { hover = tileAt(e); });
@@ -1639,8 +1645,14 @@ cv.addEventListener('click', e => {
     else if (t) { sel = t; build = null; }
     return;
   }
-  sel = t || null;
+  sel = t || nearTower(h) || null;
 });
+// 손가락이 칸 경계에 조금 빗나가도 가장 가까운 무기를 고릅니다(빈 칸을 눌렀을 때만, 칸 크기의 0.8배 안).
+function nearTower(h) {
+  let best = null, bd = (T * .8) ** 2;
+  for (const t of S.towers) { const d = (t.x - h.x) ** 2 + (t.y - h.y) ** 2; if (d < bd) { bd = d; best = t; } }
+  return best;
+}
 cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel = null; });
 window.addEventListener('keydown', e => {
   if (guideOpen) { if (e.key === 'Escape') closeGuide(); return; }
