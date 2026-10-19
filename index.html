@@ -127,12 +127,12 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; width: 100%; }
   .stat { min-width: 0; padding: 3px 6px; border-radius: 5px; }
   .stat .k { font-size: 10px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .stat .v { font-size: 15px; line-height: 1.15; }
+  .stat .v { font-size: 15px; line-height: 1.15; white-space: nowrap; }
   .app.in-lobby .stats { width: auto; }
   .main { gap: 8px; }
   .board { border-radius: 6px; display: flex; justify-content: center; }
-  /* 맵 높이 = 화면 높이 - (정보 줄 + 버튼 줄 + 무기 줄 + 아이템 줄 + 여백). 폭을 넘지 않고, 350px보다 작아지지도 않습니다(아주 작은 폰에서만 살짝 스크롤). */
-  canvas#game.rot { width: auto; max-width: 100%; height: min(max(350px, calc(100vh - 248px)), calc((100vw - 32px) * 1.6)); height: min(max(350px, calc(100dvh - 248px)), calc((100vw - 32px) * 1.6)); }
+  /* 맵 높이 = 화면 높이 - 안전 영역(노치·홈 막대) - (정보 줄 + 버튼 줄 + 무기 줄 + 아이템 줄 + 여백). 폭을 넘지 않고, 350px보다 작아지지도 않습니다(아주 작은 폰에서만 살짝 스크롤). */
+  canvas#game.rot { width: auto; max-width: 100%; height: min(max(350px, calc(100vh - 262px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))), calc((100vw - 32px) * 1.6)); height: min(max(350px, calc(100dvh - 262px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))), calc((100vw - 32px) * 1.6)); }
   aside { gap: 6px; }
   aside .controls { order: -2; }
   aside > .shop { order: -1; }
@@ -169,6 +169,9 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
   body.playing .chat-fab { display: none !important; }
   .chat-fab { padding: 8px 12px; font-size: 13px; }
   .lobby-intro { font-size: 13px; }
+  /* 앱인토스 안에서는 오른쪽 위에 ••• ✕ 버튼이 떠 있으니 그 자리를 비우고, 게임 중에는 업적 포인트 칸을 숨겨 정보 줄을 4칸으로 둡니다. */
+  html.ait header { padding-right: 92px; }
+  html.ait .app:not(.in-lobby) .stat.ap { display: none; }
 }
 kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); color: var(--text); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
