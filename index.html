@@ -131,8 +131,8 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
   .app.in-lobby .stats { width: auto; }
   .main { gap: 8px; }
   .board { border-radius: 6px; display: flex; justify-content: center; }
-  /* 맵 높이 = 화면 높이 - 안전 영역(노치·홈 막대) - (정보 줄 + 버튼 줄 + 무기 줄 + 아이템 줄 + 여백). 폭을 넘지 않고, 350px보다 작아지지도 않습니다(아주 작은 폰에서만 살짝 스크롤). */
-  canvas#game.rot { width: auto; max-width: 100%; height: min(max(350px, calc(100vh - 262px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))), calc((100vw - 32px) * 1.6)); height: min(max(350px, calc(100dvh - 262px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))), calc((100vw - 32px) * 1.6)); }
+  /* 맵 높이 = 화면 높이 - 안전 영역(노치·홈 막대) - (정보 줄 + 버튼 줄 + 무기 줄 + 아이템 줄 + 여백). 첫 줄은 env()를 못 읽는 웹뷰용 예비 값입니다. 폭을 넘지 않고, 350px보다 작아지지도 않습니다(아주 작은 폰에서만 살짝 스크롤). */
+  canvas#game.rot { width: auto; max-width: 100%; height: min(max(350px, calc(100vh - 290px)), calc((100vw - 32px) * 1.6)); height: min(max(350px, calc(100vh - 262px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))), calc((100vw - 32px) * 1.6)); height: min(max(350px, calc(100dvh - 262px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))), calc((100vw - 32px) * 1.6)); }
   aside { gap: 6px; }
   aside .controls { order: -2; }
   aside > .shop { order: -1; }
