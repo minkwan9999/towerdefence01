@@ -114,6 +114,46 @@ aside { display: grid; gap: 12px; min-width: 0; }
 .auto { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
 .auto input { accent-color: var(--brass); width: 16px; height: 16px; }
 .keys { color: var(--muted); font-size: 12px; line-height: 1.7; }
+canvas#game.rot { aspect-ratio: 10 / 16; }
+
+/* 휴대폰: 맵은 크게, 나머지는 작고 촘촘하게 */
+@media (max-width: 700px) {
+  .app { gap: 10px; padding-block: 10px 88px; }
+  header { gap: 8px; align-items: center; }
+  .eyebrow { display: none; }
+  h1 { font-size: 20px; margin: 0; }
+  .app:not(.in-lobby) header > div:first-child { display: none; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; width: 100%; }
+  .stat { min-width: 0; padding: 4px 6px; border-radius: 5px; }
+  .stat .k { font-size: 10px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .v { font-size: 15px; }
+  .app.in-lobby .stats { width: auto; }
+  .main { gap: 10px; }
+  .board { border-radius: 6px; }
+  aside { gap: 8px; }
+  aside .controls { order: -2; }
+  aside > .label-row:first-of-type { order: -1; }
+  aside > .shop { order: -1; }
+  .shop { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .tcard { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 2px; padding: 5px 2px; }
+  .tcard canvas { width: 34px; height: 34px; }
+  .tcard .nm { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tcard .meta { justify-content: center; font-size: 10px; }
+  .tcard .meta span:last-child { display: none; }
+  .items { gap: 4px; }
+  .icard canvas { width: 28px; height: 28px; }
+  .icard .nm { font-size: 12px; }
+  .icard .st { font-size: 10px; }
+  .panel { padding: 10px 12px; min-height: 0; gap: 8px; font-size: 13px; }
+  .panel .tip, .panel .passives { display: none; }
+  .btn { padding: 8px 12px; font-size: 13px; }
+  .controls { gap: 6px; }
+  .keys { display: none; }
+  .section-label { font-size: 10px; }
+  .label-row .btn.sm { padding: 4px 8px; font-size: 12px; }
+  .chat-fab { padding: 8px 12px; font-size: 13px; }
+  .lobby-intro { font-size: 13px; }
+}
 kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); color: var(--text); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
@@ -551,7 +591,22 @@ function buildWave(w) {
 // ---------- canvas ----------
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const dpr = Math.min(2, window.devicePixelRatio || 1);
-cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+// 휴대폰 세로 화면에서는 맵을 90도 돌려 세로로 그립니다(적이 위에서 들어와 아래 성문으로). 칸이 훨씬 커집니다.
+let ROT = null;
+function applyOrientation() {
+  const rot = window.matchMedia('(max-width: 700px) and (orientation: portrait)').matches;
+  if (rot === ROT) return;
+  ROT = rot;
+  cv.width = (ROT ? H : W) * dpr; cv.height = (ROT ? W : H) * dpr;
+  cv.classList.toggle('rot', ROT);
+}
+applyOrientation();
+window.addEventListener('resize', applyOrientation);
+// 돌린 화면에서도 글자는 똑바로 보이게 그립니다.
+function ctxText(method, str, x, y) {
+  if (!ROT) { ctx[method](str, x, y); return; }
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); ctx[method](str, 0, 0); ctx.restore();
+}
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -1155,6 +1210,8 @@ function endGame(won) {
 
 // ---------- render ----------
 function render() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (ROT) { ctx.translate(H, 0); ctx.rotate(Math.PI / 2); }
   ctx.drawImage(bg, 0, 0, W, H);
   const showRange = (x, y, r, color) => {
     if (!r) return;
@@ -1170,7 +1227,7 @@ function render() {
   for (const h of S.hazards) {
     ctx.save(); ctx.globalAlpha = Math.min(1, h.life / 3); ctx.translate(h.x, h.y); ctx.scale(.85, .85); drawWeapon(ctx, h.type, 0, null, true); ctx.restore();
     ctx.strokeStyle = 'rgba(235,230,211,.55)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(h.x, h.y, 24, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * h.life / HAZARD_LIFE); ctx.stroke();
-    ctx.font = '700 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctx.strokeText(Math.ceil(h.life) + 's', h.x, h.y + 27); ctx.fillStyle = '#ebe6d3'; ctx.fillText(Math.ceil(h.life) + 's', h.x, h.y + 27);
+    ctx.font = '700 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctxText('strokeText', Math.ceil(h.life) + 's', h.x, h.y + 27); ctx.fillStyle = '#ebe6d3'; ctxText('fillText', Math.ceil(h.life) + 's', h.x, h.y + 27);
   }
   if (obsView && S.obst.has(obsView)) { const o = S.obst.get(obsView); ctx.strokeStyle = '#c2a6ff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); rr(ctx, o.c * T + 3, o.r * T + 3, T - 6, T - 6, 8); ctx.stroke(); ctx.setLineDash([]); }
   for (const t of S.towers) drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
@@ -1220,7 +1277,7 @@ function render() {
       ctx.strokeStyle = '#f3ecff'; ctx.lineWidth = 2; ctx.stroke();
     } else if (f.k === 'text') {
       ctx.globalAlpha = Math.min(1, a * 1.6); ctx.font = '700 14px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctx.strokeText(f.txt, f.x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x, f.y);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(14,23,20,.85)'; ctxText('strokeText', f.txt, f.x, f.y); ctx.fillStyle = f.color; ctxText('fillText', f.txt, f.x, f.y);
     }
     ctx.globalAlpha = 1;
   }
@@ -1238,12 +1295,12 @@ function render() {
   }
   if (S.wave === 0 && !S.waveActive) {
     ctx.font = '500 13px "IBM Plex Sans KR", sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(235,230,211,.8)';
-    ctx.fillText('적은 여기서 옵니다', 34, PTS[0].y - 34);
-    ctx.textAlign = 'right'; ctx.fillText('성문을 지키세요', W - 34, PTS[PTS.length - 1].y - 60);
+    if (ROT) { ctx.textAlign = 'center'; ctxText('fillText', '적은 여기서 옵니다 ↓', 18, PTS[0].y); ctxText('fillText', '↓ 성문을 지키세요', W - 70, PTS[PTS.length - 1].y); }
+    else { ctx.fillText('적은 여기서 옵니다', 34, PTS[0].y - 34); ctx.textAlign = 'right'; ctx.fillText('성문을 지키세요', W - 34, PTS[PTS.length - 1].y - 60); }
   }
   if (paused && !S.over) {
     ctx.fillStyle = 'rgba(8,14,12,.5)'; ctx.fillRect(0, 0, W, H);
-    ctx.font = '400 44px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctx.fillText('일시정지', W / 2, H / 2 + 14);
+    ctx.font = '400 44px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctxText('fillText', '일시정지', W / 2, H / 2 + 14);
   }
 }
 
@@ -1357,7 +1414,7 @@ function refreshUI() {
     key = 'i' + nextW + S.waveActive;
     html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
-      <p>적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 ${Math.round(sellRate() * 100)}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.</p>${passiveSummary()}`;
+      <p class="tip">적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 ${Math.round(sellRate() * 100)}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.</p>${passiveSummary()}`;
   }
   if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
 }
@@ -1482,7 +1539,8 @@ $('garage').addEventListener('click', e => {
 
 function tileAt(ev) {
   const r = cv.getBoundingClientRect();
-  const x = (ev.clientX - r.left) / r.width * W, y = (ev.clientY - r.top) / r.height * H;
+  const lx = (ev.clientX - r.left) / r.width * (ROT ? H : W), ly = (ev.clientY - r.top) / r.height * (ROT ? W : H);
+  const x = ROT ? ly : lx, y = ROT ? H - lx : ly;
   const c = Math.floor(x / T), row = Math.floor(y / T);
   return c >= 0 && c < COLS && row >= 0 && row < ROWS ? { c, r: row } : null;
 }
