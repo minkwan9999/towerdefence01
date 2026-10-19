@@ -623,7 +623,18 @@ function applyOrientation() {
   cv.classList.toggle('rot', ROT);
 }
 applyOrientation();
-window.addEventListener('resize', applyOrientation);
+// 휴대폰 세로 화면: CSS로 정한 맵 높이에서 실제로 넘친 만큼만 줄여 스크롤이 생기지 않게 합니다.
+// (앱인토스처럼 안전 영역 값을 알려 주지 않는 웹뷰에서도 실제 화면 높이로 맞춥니다.)
+function fitMap() {
+  cv.style.height = '';
+  if (!ROT || !document.body.classList.contains('playing')) return;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const over = document.documentElement.scrollHeight - vh;
+  if (over > 0) cv.style.height = Math.max(280, cv.getBoundingClientRect().height - over - 2) + 'px';
+}
+function onResize() { applyOrientation(); fitMap(); }
+window.addEventListener('resize', onResize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
 // 돌린 화면에서도 글자는 똑바로 보이게 그립니다.
 function ctxText(method, str, x, y) {
   if (!ROT) { ctx[method](str, x, y); return; }
@@ -1484,6 +1495,7 @@ function startGame(i) {
   reset(i); panelKey = ''; inLobby = false;
   document.querySelector('.app').classList.remove('in-lobby');
   $('lobby').hidden = true;
+  fitMap(); requestAnimationFrame(fitMap); setTimeout(fitMap, 400);
 }
 function passiveSummary() {
   const on = SKILLS.filter(k => skillLv(k.id) > 0);
