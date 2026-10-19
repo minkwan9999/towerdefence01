@@ -153,8 +153,13 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
   .icard { grid-template-columns: 24px minmax(0, 1fr); justify-items: start; align-items: center; text-align: left; gap: 5px; padding: 4px 6px; border-top-width: 2px; }
   .icard canvas { width: 24px; height: 24px; }
   .icard .nm { font-size: 12px; }
+  .affbox { min-width: 50px; padding: 3px 4px; }
+  .affbox .ah { display: none; }
+  .affbox .av::before { content: '💗'; font-size: 11px; margin-right: 2px; }
+  .affbox .av { font-size: 15px; }
   .icard .st { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .icard > span { min-width: 0; }
+  .icard > span { min-width: 0; overflow: hidden; }
+  .icard .cnt { display: none; }
   .panel { display: none; }
   .panel.sheet {
     display: grid; position: fixed; z-index: 40; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
@@ -319,7 +324,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .mcard canvas { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 4px; display: block; }
 .mname { font-weight: 700; }
 .mcard .kv { font-size: 12px; }
-.items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 6px; }
+.affbox { position: relative; display: grid; justify-items: center; align-content: center; gap: 1px; min-width: 64px; padding: 4px 8px; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-top: 3px solid #e86a92; border-radius: 6px; cursor: pointer; }
+.affbox .ah { font-size: 14px; line-height: 1; }
+.affbox .av { font-size: 18px; font-weight: 700; line-height: 1.1; color: #f2a0bd; }
+.affbox .an { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.affbox.drop .av { animation: affDrop .7s ease-out; }
+.affbox.gain .av { animation: affGain .7s ease-out; }
+.adelta { position: absolute; top: -4px; right: 2px; font: 700 12px var(--f-mono); pointer-events: none; animation: affFloat 1.2s ease-out forwards; }
+.adelta.down { color: #ff7a7a; } .adelta.up { color: #a5d46a; }
+@keyframes affDrop { 0% { transform: scale(1.35); color: #ff7a7a; } 100% { transform: scale(1); } }
+@keyframes affGain { 0% { transform: scale(1.35); color: #a5d46a; } 100% { transform: scale(1); } }
+@keyframes affFloat { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-14px); } }
 .icard { display: grid; justify-items: center; gap: 2px; text-align: center; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--ic); border-radius: 6px; padding: 6px 4px; cursor: pointer; }
 .icard:hover:not(:disabled) { background: var(--panel-2); }
 .icard:disabled { cursor: default; opacity: .55; }
@@ -2446,7 +2462,7 @@ function renderItemsBar() {
     const nOn = k === 'secret1' ? S.planes.length : S.hazards.filter(h => h.type === k).length;
     if (it.consumable) {
       if (placing) { st = '길 칸을 고르세요 · 취소'; act = 'use'; }
-      else { st = `💗 ${ITEM_COST}씩 · ` + (it.place ? '1분' : '출격') + (nOn ? ` · ${nOn}${it.place ? '개 놓임' : '대 비행 중'}` : ''); act = 'use'; b.disabled = S.over || !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
+      else { st = `💗 ${ITEM_COST}씩 · ` + (it.place ? '1분' : '출격') + (nOn ? `<span class="cnt"> · ${nOn}${it.place ? '개 놓임' : '대 비행 중'}</span>` : ''); act = 'use'; b.disabled = S.over || !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
       b.classList.remove('locked');
     } else if (!own) { st = `💗 ${ITEM_COST}로 구매`; act = 'buy'; b.disabled = !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
     else if (used) { st = '이번 판 사용함'; act = ''; b.disabled = true; }
@@ -2457,8 +2473,20 @@ function renderItemsBar() {
     drawItemIcon(b.querySelector('canvas'), k);
     bar.appendChild(b);
   }
+  // 오른쪽 끝: 지금 대화 상대의 호감도. 아이템을 쓰면 여기서 줄어드는 게 보이고, 누르면 대화창이 열립니다.
+  const box = document.createElement('button'); box.type = 'button'; box.className = 'affbox'; box.dataset.affbox = '1';
+  box.title = P ? `${P.name}의 호감도 · 눌러서 대화` : '대화 상대를 먼저 고르세요';
+  box.innerHTML = `<span class="ah">💗</span><span class="av mono">${P ? aff : '–'}</span><span class="an">${P ? P.name : '상대 없음'}</span>`;
+  if (P && lastBarAff && lastBarAff.id === P.id && aff !== lastBarAff.v) {
+    const d = document.createElement('span'); d.className = 'adelta ' + (aff < lastBarAff.v ? 'down' : 'up'); d.textContent = (aff < lastBarAff.v ? '−' : '+') + Math.abs(aff - lastBarAff.v);
+    box.appendChild(d); box.classList.add(aff < lastBarAff.v ? 'drop' : 'gain');
+  }
+  lastBarAff = P ? { id: P.id, v: aff } : null;
+  bar.appendChild(box);
 }
+let lastBarAff = null;
 $('itemsBar').addEventListener('click', e => {
+  if (e.target.closest('[data-affbox]')) { openChat(); return; }
   const b = e.target.closest('[data-item]'); if (!b || b.disabled) return;
   if (b.dataset.act === 'buy') buyItem(b.dataset.item);
   else if (b.dataset.act === 'use') useItem(b.dataset.item);
