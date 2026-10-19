@@ -507,8 +507,8 @@ const ITEMS = {
   secret2: { name: '불', color: '#ff7a2f', place: true, consumable: true, desc: '길 한 칸에 1분 동안 불을 놓습니다. 지나가는 적은 불이 붙어 4초 동안 체력이 계속 줄어듭니다. 놓을 때마다 호감도를 씁니다.' },
   secret3: { name: '웅덩이', color: '#3f8fd0', place: true, consumable: true, desc: '길 한 칸에 1분 동안 웅덩이를 만듭니다. 지나가는 적은 3초 동안 40% 느려집니다. 놓을 때마다 호감도를 씁니다.' },
 };
-// 테스트용: 원래 값은 50. 테스트가 끝나면 50으로 되돌립니다.
-const ITEM_KEYS = Object.keys(ITEMS), ITEM_COST = 1;
+// 비행기·불·웅덩이를 한 번 쓸 때 드는 호감도.
+const ITEM_KEYS = Object.keys(ITEMS), ITEM_COST = 3;
 // 적군은 아군과 똑같은 차량을 검은색으로 칠한 것입니다.
 const ENEMIES = {
   grunt:  { name: '검은 택시',     car: 'taxi',   hp: 42,   speed: 1.15, reward: 6,   lives: 1,  scale: .9 },
@@ -694,8 +694,7 @@ function drawVehicle(g, type, off) {
 }
 // towers are weapons drawn top-down; rotating ones face +x
 // 무기 색 바꾸기: 패시브 상점에서 200 AP로 사면 보유 무기 하나에 일곱 색 중 하나를 칠할 수 있습니다.
-// 테스트용: 원래 값은 200. 테스트가 끝나면 200으로 되돌립니다.
-const PAINT_COST = 1;
+const PAINT_COST = 200;
 const PAINTS = [
   { id: 'red',    name: '빨강', hex: '#e5484d' },
   { id: 'orange', name: '주황', hex: '#f2873a' },
@@ -1915,7 +1914,7 @@ const rollTrigger = () => pick(TRIGGERS);
 // 호감도는 대화 상대마다 따로 쌓입니다. 메시지 하나에 대략 0.4~2점이 오르도록 설계했습니다.
 //  기본 0.4 + 글자 수 보너스(최대 0.6) + 알아듣는 주제 0.5 + 상대에게 관심 보이기(이름·음식·취미·꿈·나이) 0.3
 //  + 칭찬·고마움 표현 0.8. 최근 5개와 같은 말은 0점, 4초 안에 연달아 보내면 30%만 오릅니다.
-//  퀴즈를 맞히면 +3, 틀려도 +0.5. 그래서 아이템 하나(50)를 사려면 대략 40~60번 대화가 필요합니다.
+//  퀴즈를 맞히면 +3, 틀려도 +0.5. 아이템 한 번(호감도 3)에는 대략 2~5번 대화가 필요합니다.
 const AFF_MILESTONES = [10, 25, 50, 100, 200];
 const affOf = P => prog.aff[P.id] || 0;
 function gainAff(c, amt) {
