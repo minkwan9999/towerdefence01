@@ -116,41 +116,57 @@ aside { display: grid; gap: 12px; min-width: 0; }
 .keys { color: var(--muted); font-size: 12px; line-height: 1.7; }
 canvas#game.rot { aspect-ratio: 10 / 16; }
 
-/* 휴대폰: 맵은 크게, 나머지는 작고 촘촘하게 */
+/* 휴대폰: 스크롤 없이 한 화면. 맵은 남는 높이를 모두 쓰고, 나머지는 작고 촘촘하게 */
+.m-only { display: none; }
 @media (max-width: 700px) {
-  .app { gap: 10px; padding-block: 10px 88px; }
+  .app { gap: 8px; padding-block: 8px 10px; }
   header { gap: 8px; align-items: center; }
   .eyebrow { display: none; }
   h1 { font-size: 20px; margin: 0; }
   .app:not(.in-lobby) header > div:first-child { display: none; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; width: 100%; }
-  .stat { min-width: 0; padding: 4px 6px; border-radius: 5px; }
+  .stat { min-width: 0; padding: 3px 6px; border-radius: 5px; }
   .stat .k { font-size: 10px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .stat .v { font-size: 15px; }
+  .stat .v { font-size: 15px; line-height: 1.15; }
   .app.in-lobby .stats { width: auto; }
-  .main { gap: 10px; }
-  .board { border-radius: 6px; }
-  aside { gap: 8px; }
+  .main { gap: 8px; }
+  .board { border-radius: 6px; display: flex; justify-content: center; }
+  /* 맵 높이 = 화면 높이 - (정보 줄 + 버튼 줄 + 무기 줄 + 아이템 줄 + 여백). 폭을 넘지 않고, 350px보다 작아지지도 않습니다(아주 작은 폰에서만 살짝 스크롤). */
+  canvas#game.rot { width: auto; max-width: 100%; height: min(max(350px, calc(100vh - 248px)), calc((100vw - 32px) * 1.6)); height: min(max(350px, calc(100dvh - 248px)), calc((100vw - 32px) * 1.6)); }
+  aside { gap: 6px; }
   aside .controls { order: -2; }
-  aside > .label-row:first-of-type { order: -1; }
   aside > .shop { order: -1; }
-  .shop { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
-  .tcard { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 2px; padding: 5px 2px; }
-  .tcard canvas { width: 34px; height: 34px; }
-  .tcard .nm { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .tcard .meta { justify-content: center; font-size: 10px; }
+  aside > .label-row, aside > .section-label, #lobbyBtn, .auto, .keys { display: none !important; }
+  .controls { grid-template-columns: minmax(0, 1fr) repeat(5, 40px); gap: 4px; }
+  .controls .btn { padding: 7px 0; font-size: 13px; min-width: 0; }
+  #startBtn { padding: 7px 8px; }
+  .m-only { display: inline-flex; position: relative; }
+  #lobbyBtnM { font-size: 11px; }
+  #chatBadgeM { position: absolute; top: -5px; right: -4px; font-size: 9px; min-width: 15px; padding: 0 3px; }
+  .shop { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .tcard { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 1px; padding: 4px 1px 3px; border-radius: 5px; }
+  .tcard canvas { width: 30px; height: 30px; }
+  .tcard .nm { display: none; }
+  .tcard .meta { justify-content: center; font-size: 9.5px; white-space: nowrap; }
   .tcard .meta span:last-child { display: none; }
   .items { gap: 4px; }
-  .icard canvas { width: 28px; height: 28px; }
+  .icard { grid-template-columns: 24px minmax(0, 1fr); justify-items: start; align-items: center; text-align: left; gap: 5px; padding: 4px 6px; border-top-width: 2px; }
+  .icard canvas { width: 24px; height: 24px; }
   .icard .nm { font-size: 12px; }
-  .icard .st { font-size: 10px; }
-  .panel { padding: 10px 12px; min-height: 0; gap: 8px; font-size: 13px; }
+  .icard .st { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .icard > span { min-width: 0; }
+  .panel { display: none; }
+  .panel.sheet {
+    display: grid; position: fixed; z-index: 40; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)); max-height: 46vh; overflow-y: auto;
+    padding: 10px 12px; min-height: 0; gap: 8px; font-size: 13px; box-shadow: 0 -10px 40px rgba(0, 0, 0, .55); border-color: var(--brass);
+  }
   .panel .tip, .panel .passives { display: none; }
+  .panel.sheet .sheet-x { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; padding: 0; justify-content: center; align-items: center; font-size: 15px; }
+  .panel.sheet h3 { padding-right: 40px; }
+  .panel:not(.sheet) .sheet-x { display: none; }
   .btn { padding: 8px 12px; font-size: 13px; }
-  .controls { gap: 6px; }
-  .keys { display: none; }
-  .section-label { font-size: 10px; }
-  .label-row .btn.sm { padding: 4px 8px; font-size: 12px; }
+  body.playing .chat-fab { display: none !important; }
   .chat-fab { padding: 8px 12px; font-size: 13px; }
   .lobby-intro { font-size: 13px; }
 }
@@ -409,6 +425,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
         <button class="btn primary" id="startBtn" type="button">웨이브 1 시작</button>
         <button class="btn" id="speedBtn" type="button" aria-label="게임 속도"><span class="mono">1×</span></button>
         <button class="btn" id="pauseBtn" type="button" aria-label="일시정지">❚❚</button>
+        <button class="btn m-only" id="guideBtnM" type="button" aria-label="무기 특성">📖</button>
+        <button class="btn m-only" id="chatBtnM" type="button" aria-label="대화 열기">💬<span class="fab-badge" id="chatBadgeM" hidden>0</span></button>
+        <button class="btn m-only" id="lobbyBtnM" type="button" aria-label="로비로 나가기">로비</button>
       </div>
       <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
       <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
@@ -1416,12 +1435,14 @@ function refreshUI() {
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
       <p class="tip">적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 ${Math.round(sellRate() * 100)}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.</p>${passiveSummary()}`;
   }
-  if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html; }
+  if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html + '<button class="btn sheet-x m-only" type="button" data-act="close" aria-label="닫기">✕</button>'; }
+  $('panel').classList.toggle('sheet', !!(sel || lockView || (obsView && S.obst.has(obsView))));
 }
 $('panel').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act;
   if (a === 'guide') openGuide(build || (sel && sel.type) || lockView);
+  if (a === 'close') { sel = null; build = null; lockView = null; obsView = null; itemPlace = null; }
   if (a === 'cancel') { build = null; lockView = null; obsView = null; itemPlace = null; }
   if (a === 'clear' && obsView && clearObstacle(obsView)) obsView = null;
   if (a === 'unlock' && lockView && unlockVehicle(lockView)) { const t = lockView; lockView = null; build = t; }
@@ -1435,21 +1456,27 @@ $('pauseBtn').addEventListener('click', () => { paused = !paused; });
 $('restartBtn').addEventListener('click', () => startGame(S.diff));
 $('ovLobbyBtn').addEventListener('click', showLobby);
 let leaveArmed = 0;
-$('lobbyBtn').addEventListener('click', () => {
-  if (S.wave === 0 || S.over || leaveArmed > performance.now()) { leaveArmed = 0; showLobby(); return; }
+const LEAVE_LABEL = { lobbyBtn: ['로비로 나가기', '나가면 이번 판은 기록되지 않아요 · 한 번 더 누르기'], lobbyBtnM: ['로비', '나가기?'] };
+function resetLeaveLabels() { for (const id in LEAVE_LABEL) $(id).textContent = LEAVE_LABEL[id][0]; }
+function onLeave(id) {
+  if (S.wave === 0 || S.over || leaveArmed > performance.now()) { leaveArmed = 0; resetLeaveLabels(); showLobby(); return; }
   leaveArmed = performance.now() + 3000;
-  $('lobbyBtn').textContent = '나가면 이번 판은 기록되지 않아요 · 한 번 더 누르기';
-  setTimeout(() => { if (leaveArmed && leaveArmed <= performance.now() + 50) { leaveArmed = 0; $('lobbyBtn').textContent = '로비로 나가기'; } }, 3050);
-});
+  $(id).textContent = LEAVE_LABEL[id][1];
+  setTimeout(() => { if (leaveArmed && leaveArmed <= performance.now() + 50) { leaveArmed = 0; resetLeaveLabels(); } }, 3050);
+}
+$('lobbyBtn').addEventListener('click', () => onLeave('lobbyBtn'));
+$('lobbyBtnM').addEventListener('click', () => onLeave('lobbyBtnM'));
 
 // ---------- lobby ----------
 function showLobby() {
   inLobby = true; build = null; sel = null; lockView = null; obsView = null; leaveArmed = 0;
-  $('lobbyBtn').textContent = '로비로 나가기';
+  resetLeaveLabels();
+  document.body.classList.remove('playing');
   document.querySelector('.app').classList.add('in-lobby');
   $('lobby').hidden = false; renderLobby();
 }
 function startGame(i) {
+  document.body.classList.add('playing');
   for (const b of $('shop').children) drawShopIcon(b, b.dataset.type);
   reset(i); panelKey = ''; inLobby = false;
   document.querySelector('.app').classList.remove('in-lobby');
@@ -2171,6 +2198,7 @@ function updateFab() {
   const lab2 = P ? `${label} 💗${Math.floor(affOf(P))}` : label;
   if ($('fabName').textContent !== lab2) $('fabName').textContent = lab2;
   $('fabBadge').hidden = !n; if (n) $('fabBadge').textContent = Math.min(9, n);
+  $('chatBadgeM').hidden = !n; if (n) $('chatBadgeM').textContent = Math.min(9, n);
 }
 
 function refreshComposer() {
@@ -2288,6 +2316,7 @@ function onNewGame() {
 
 $('chatClose').addEventListener('click', closeChat);
 $('chatFab').addEventListener('click', openChat);
+$('chatBtnM').addEventListener('click', () => chatOpen ? closeChat() : openChat());
 $('chatSwap').addEventListener('click', () => { picking = true; renderChat(); });
 $('chatForm').addEventListener('submit', e => { e.preventDefault(); send(chatInput.value); });
 chatInput.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
@@ -2460,6 +2489,7 @@ $('guideClose').addEventListener('click', closeGuide);
 $('guide').addEventListener('click', e => { if (e.target === $('guide')) closeGuide(); });
 $('guideBtn').addEventListener('click', () => openGuide(build || (sel && sel.type) || lockView));
 $('guideBtnLobby').addEventListener('click', () => openGuide());
+$('guideBtnM').addEventListener('click', () => openGuide(build || (sel && sel.type) || lockView));
 
 // ---------- loop ----------
 let last = performance.now();
