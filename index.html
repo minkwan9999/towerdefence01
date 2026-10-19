@@ -162,8 +162,8 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
     padding: 10px 12px; min-height: 0; gap: 8px; font-size: 13px; box-shadow: 0 -10px 40px rgba(0, 0, 0, .55); border-color: var(--brass);
   }
   .panel .tip, .panel .passives { display: none; }
-  .panel.sheet .sheet-x { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; padding: 0; justify-content: center; align-items: center; font-size: 15px; }
-  .panel.sheet h3 { padding-right: 40px; }
+  .panel.sheet .sheet-x { position: absolute; top: 6px; right: 6px; height: 32px; padding: 0 12px; justify-content: center; align-items: center; font-size: 13px; }
+  .panel.sheet h3 { padding-right: 64px; }
   .panel:not(.sheet) .sheet-x { display: none; }
   .btn { padding: 8px 12px; font-size: 13px; }
   body.playing .chat-fab { display: none !important; }
@@ -172,6 +172,9 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
   /* 앱인토스 안에서는 오른쪽 위에 ••• ✕ 버튼이 떠 있으니 그 자리를 비우고, 게임 중에는 업적 포인트 칸을 숨겨 정보 줄을 4칸으로 둡니다. */
   html.ait header { padding-right: 92px; }
   html.ait .app:not(.in-lobby) .stat.ap { display: none; }
+  html.ait .guide { padding-top: 110px; padding-top: max(110px, calc(env(safe-area-inset-top, 0px) + 56px)); }
+  html.ait .guide-box { max-height: 100%; }
+  html.ait .chat { height: min(560px, calc(100vh - 140px)); }
 }
 kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); color: var(--text); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
@@ -200,7 +203,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .chat-sub { font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: .04em; display: flex; align-items: center; gap: 6px; }
 .chat-sub:empty::before { display: none; }
 .chat-sub::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #7ed35f; box-shadow: 0 0 6px #7ed35f; animation: blink 1.6s infinite; }
-.chat-x { margin-left: auto; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.chat-x { margin-left: auto; min-width: 34px; height: 34px; padding: 0 10px; white-space: nowrap; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer; }
 .chat-x:hover { color: var(--text); border-color: var(--muted); }
 .chat-x { margin-left: 0; }
 .chat-swap { margin-left: auto; }
@@ -433,7 +436,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
         <button class="btn m-only" id="lobbyBtnM" type="button" aria-label="로비로 나가기">로비</button>
       </div>
       <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
-      <label class="auto"><input type="checkbox" id="autoChk"> 웨이브가 끝나면 다음 웨이브 자동 시작</label>
       <div class="keys">
         <kbd>1</kbd>–<kbd>7</kbd> 무기 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>I</kbd> 무기 특성 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
       </div>
@@ -443,7 +445,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 
 <div class="guide" id="guide" role="dialog" aria-modal="true" aria-labelledby="guideTitle" hidden>
   <div class="guide-box" id="guideBox">
-    <div class="guide-head"><h2 id="guideTitle">무기 특성</h2><button class="chat-x" id="guideClose" type="button" aria-label="무기 특성 닫기">×</button></div>
+    <div class="guide-head"><h2 id="guideTitle">무기 특성</h2><button class="chat-x" id="guideClose" type="button" aria-label="무기 특성 닫기">닫기</button></div>
     <p class="guide-note" id="guideNote"></p>
     <div class="guide-list" id="guideList"></div>
   </div>
@@ -456,7 +458,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
     <canvas id="chatAvatar" width="76" height="76" aria-hidden="true"></canvas>
     <div><div class="chat-name"><span id="chatName">대화 상대 고르기</span> <span class="chat-aff" id="chatAff" hidden>💗 0</span></div><div class="chat-sub" id="chatSub">함께 수다 떨 사람을 골라 주세요</div></div>
     <button class="btn sm chat-swap" id="chatSwap" type="button" hidden>상대 바꾸기</button>
-    <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">×</button>
+    <button class="chat-x" id="chatClose" type="button" aria-label="대화 닫기">닫기</button>
   </div>
   <div class="chat-body" id="chatBody"></div>
   <div class="chat-replies" id="chatReplies"></div>
@@ -1043,8 +1045,10 @@ function drawObstacle(g, o) {
 
 // ---------- state ----------
 let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, time = 0, inLobby = true, lockView = null, obsView = null;
+// 웨이브는 자동으로 이어집니다: 첫 웨이브는 준비 시간 뒤, 다음 웨이브는 앞 웨이브를 막고 잠시 뒤 시작합니다. 버튼으로 바로 부를 수도 있습니다.
+const FIRST_WAVE_DELAY = 12, NEXT_WAVE_DELAY = 5;
 function reset(diff) {
-  S = { prevMap: S ? S.map : -1, diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: -1, slowAll: 0, itemUsed: {}, hazards: [], planes: [] };
+  S = { prevMap: S ? S.map : -1, diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: FIRST_WAVE_DELAY, slowAll: 0, itemUsed: {}, hazards: [], planes: [] };
   let mi = Math.floor(Math.random() * MAPS.length);
   if (S.prevMap === mi) mi = (mi + 1 + Math.floor(Math.random() * (MAPS.length - 1))) % MAPS.length;
   S.map = mi; setMap(mi);
@@ -1216,7 +1220,7 @@ function update(dt) {
     S.fx[S.fx.length - 1].life = S.fx[S.fx.length - 1].max = 2;
     onWaveCleared();
     if (S.wave >= MAX_WAVE) { endGame(true); return; }
-    if (document.getElementById('autoChk').checked) S.autoT = 2;
+    S.autoT = NEXT_WAVE_DELAY;
   }
   if (S.autoT > 0) { S.autoT -= dt; if (S.autoT <= 0) startWave(); }
 }
@@ -1398,7 +1402,7 @@ function refreshUI() {
   }
   const sb = $('startBtn');
   sb.disabled = S.waveActive || S.over || S.wave >= MAX_WAVE;
-  sb.textContent = S.waveActive ? '웨이브 ' + S.wave + ' 진행 중' : S.autoT > 0 ? '곧 웨이브 ' + (S.wave + 1) : '웨이브 ' + (S.wave + 1) + ' 시작';
+  sb.textContent = S.waveActive ? '웨이브 ' + S.wave + ' 진행 중' : S.autoT > 0 ? '▶ 웨이브 ' + (S.wave + 1) + ' · ' + Math.ceil(S.autoT) + '초' : '웨이브 ' + (S.wave + 1) + ' 시작';
   $('speedBtn').innerHTML = `<span class="mono">${speed}×</span>`;
   $('pauseBtn').textContent = paused ? '▶' : '❚❚';
   $('pauseBtn').setAttribute('aria-label', paused ? '계속하기' : '일시정지');
@@ -1449,7 +1453,7 @@ function refreshUI() {
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
       <p class="tip">적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 ${Math.round(sellRate() * 100)}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.</p>${passiveSummary()}`;
   }
-  if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html + '<button class="btn sheet-x m-only" type="button" data-act="close" aria-label="닫기">✕</button>'; }
+  if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html + '<button class="btn sheet-x m-only" type="button" data-act="close">닫기</button>'; }
   $('panel').classList.toggle('sheet', !!(sel || lockView || (obsView && S.obst.has(obsView))));
 }
 $('panel').addEventListener('click', e => {
