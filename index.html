@@ -1418,7 +1418,7 @@ function refreshUI() {
   $('sDiff').textContent = D.name + ' · ' + MAP.name + ' · 제한 ' + mmss(limitOf(D, MAP));
   $('sTime').textContent = mmss(S.time);
   $('sTimeBox').classList.toggle('late', S.time > limitOf(D, MAP));
-  $('sWave').textContent = S.wave + ' / ' + MAX_WAVE;
+  $('sWave').textContent = S.wave + (ROT ? '/' : ' / ') + MAX_WAVE; // 휴대폰에서는 두 자리 웨이브도 칸에 들어가게 띄어쓰기를 뺍니다
   renderItemsBar();
   $('sGold').textContent = S.gold;
   $('sLives').textContent = S.lives;
