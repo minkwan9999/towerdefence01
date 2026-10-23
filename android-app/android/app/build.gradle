@@ -8,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // 구글 플레이에 올릴 때마다 versionCode 를 1씩 올려야 합니다(CI 에서는 VERSION_CODE 로 넘김).
-        versionCode (System.getenv("VERSION_CODE") ?: "1").toInteger()
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
         versionName System.getenv("VERSION_NAME") ?: "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

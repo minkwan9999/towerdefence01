@@ -141,7 +141,7 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
   aside > .label-row, aside > .section-label, #lobbyBtn, .auto, .keys { display: none !important; }
   .controls { grid-template-columns: minmax(0, 1fr) repeat(5, 40px); gap: 4px; }
   .controls .btn { padding: 7px 0; font-size: 13px; min-width: 0; }
-  #startBtn { padding: 7px 8px; }
+  #startBtn { padding: 7px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.02em; }
   .m-only { display: inline-flex; position: relative; }
   #lobbyBtnM { font-size: 11px; }
   #chatBadgeM { position: absolute; top: -5px; right: -4px; font-size: 9px; min-width: 15px; padding: 0 3px; }
