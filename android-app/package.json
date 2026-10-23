@@ -1,0 +1,15 @@
+{
+  "name": "canyon-hold-android",
+  "private": true,
+  "version": "1.0.0",
+  "description": "협곡 방어전 구글 플레이(안드로이드) 앱. 루트 index.html 을 www/ 로 복사해 Capacitor 로 감쌉니다.",
+  "scripts": {
+    "sync-web": "node scripts/sync-web.mjs",
+    "sync": "npm run sync-web && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/cli": "8.5.3",
+    "@capacitor/core": "8.5.3"
+  }
+}
