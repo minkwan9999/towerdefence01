@@ -71,7 +71,7 @@ GitHub → Actions → **Android 앱 빌드** → Run workflow
 
 - **앱 아이콘 (512×512)**: `apps-in-toss/store-assets/play-icon-512.png`
 - **그래픽 이미지 (1024×500)**: `apps-in-toss/store-assets/play-feature-1024x500.png`
-- **휴대전화 스크린샷 (1080×2160, 6장)**: `apps-in-toss/store-assets/play-screens/`
+- **휴대전화 스크린샷 (1080×1920 = 9:16, 6장)**: `apps-in-toss/store-assets/play-screens/`
 - **카테고리**: 게임 › 전략
 - **태그(선택)**: 타워 디펜스, 전략, 오프라인
 - **연락처 이메일**: (플레이 콘솔 계정 이메일)
