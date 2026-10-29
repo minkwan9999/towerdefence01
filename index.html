@@ -182,6 +182,9 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
   body.playing .chat-fab { display: none !important; }
   .chat-fab { padding: 8px 12px; font-size: 13px; }
   .lobby-intro { font-size: 13px; }
+  .wtable table { font-size: 11.5px; }
+  .wtable th, .wtable td { padding: 4px 3px; }
+  .wtable tbody th { white-space: normal; }
   .chat .chat-form input { font-size: 16px; } /* 16px보다 작으면 iOS가 입력할 때 화면을 확대합니다 */
   /* 앱인토스 안에서는 오른쪽 위에 ••• ✕ 버튼이 떠 있으니 그 자리를 비우고, 게임 중에는 업적 포인트 칸을 숨겨 정보 줄을 4칸으로 둡니다. */
   html.ait header { padding-right: 92px; }
@@ -295,6 +298,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 .stat.time.late .v { color: var(--danger); }
 .lobby { display: grid; gap: 14px; }
 .lobby[hidden] { display: none; }
+.lang-row { display: flex; justify-content: flex-end; }
 .lobby-intro { max-width: 68ch; color: var(--muted); margin: 0; }
 .lobby-intro b { color: var(--text); font-weight: 700; }
 .diffs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
@@ -417,7 +421,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   </header>
 
   <section class="lobby game-lobby" id="lobby" hidden>
-    <p class="lobby-intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나, 무기고에서 새 무기를 해제하거나, 맵의 장애물을 치웁니다(하나에 5 AP). 맵은 5종이고 판마다 무작위로 나옵니다. 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
+    <div class="lang-row"><button class="btn sm" id="langBtn" type="button" aria-label="언어 / Language">🌐 English</button></div>
+    <p class="lobby-intro" data-t="intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나, 무기고에서 새 무기를 해제하거나, 맵의 장애물을 치웁니다(하나에 5 AP). 맵은 5종이고 판마다 무작위로 나옵니다. 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
     <div class="section-label">난이도 선택</div>
     <div class="diffs" id="diffs"></div>
     <div class="section-label">패시브 상점 · 업적 포인트로 영구 강화</div>
@@ -461,7 +466,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
         <button class="btn m-only" id="lobbyBtnM" type="button" aria-label="로비로 나가기">로비</button>
       </div>
       <button class="btn" id="lobbyBtn" type="button">로비로 나가기</button>
-      <div class="keys">
+      <div class="keys" data-t="keys">
         <kbd>1</kbd>–<kbd>7</kbd> 무기 선택 · <kbd>Space</kbd> 웨이브 시작 · <kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>I</kbd> 무기 특성 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 취소
       </div>
     </aside>
@@ -500,6 +505,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
 (() => {
 const COLS = 16, ROWS = 10, T = 60, W = COLS * T, H = ROWS * T, MAX_WAVE = 20;
 const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- language ----------
+// 한국어 / English. 저장된 선택이 있으면 그것을, 없으면 앱인토스·한국어 브라우저는 한국어, 그 밖에는 영어로 시작합니다.
+// 로비의 언어 버튼으로 바꾸면 저장하고 새로 고칩니다(그래서 게임 중에는 언어가 바뀌지 않습니다).
+const LANG_KEY = 'canyonhold.lang';
+const LANG = (() => {
+  try { const s = localStorage.getItem(LANG_KEY); if (s === 'ko' || s === 'en') return s; } catch (e) { /* storage unavailable */ }
+  if (document.documentElement.classList.contains('ait')) return 'ko';
+  return /^ko/i.test(navigator.language || '') ? 'ko' : 'en';
+})();
+const IS_EN = LANG === 'en';
+const EN = {};   // 한국어 문장 → English. 아래 EN_TEXT 가 채웁니다. 없는 문장은 한국어 그대로 나옵니다.
+// tr('웨이브 {n} 진행 중', { n: 3 }): 한국어 문장을 키로 쓰고, 영어일 때만 EN 에서 바꿔 끼웁니다.
+const tr = (ko, v) => {
+  const s = IS_EN && EN[ko] !== undefined ? EN[ko] : ko;
+  return v ? s.replace(/\{(\w+)\}/g, (_, k) => (v[k] === undefined ? '' : v[k])) : s;
+};
 
 // ---------- maps ----------
 // 맵 5종. 모두 왼쪽 가장자리에서 들어와 오른쪽 성문으로 나갑니다. 판을 시작할 때마다 무작위로 하나를 고릅니다.
@@ -997,6 +1019,266 @@ const OBST_TYPES = {
   logs:   { name: '통나무 더미',  desc: '베어 놓은 통나무가 쌓여 있습니다.' },
 };
 const OBST_KEYS = Object.keys(OBST_TYPES);
+
+// ---------- English text ----------
+if (IS_EN) {
+  Object.assign(EN, {
+    // 고정 화면(HTML)
+    'Canyon Hold · 무기 부대 vs 검은 차량 군단': 'Canyon Hold · Weapon Squad vs the Black Car Legion',
+    '협곡 방어전': 'Canyon Hold',
+    '웨이브': 'Wave', '금화': 'Gold', '성문 내구도': 'Gate HP', '업적 포인트': 'AP', '적 감속 20%': 'Enemies slowed 20%', '30초': '30s',
+    'intro': 'Pick a difficulty and hold off all 20 waves. <b>Clear it within the time limit to earn Achievement Points (AP).</b> Gold disappears when the game ends; only AP stays. You can replay any difficulty as often as you like, and spend AP on passive skills, new weapons in the armory, and clearing map obstacles (5 AP each). There are 5 maps, picked at random every game. Each difficulty step makes enemies 1.2× tougher and faster.',
+    '난이도 선택': 'Choose a difficulty',
+    '패시브 상점 · 업적 포인트로 영구 강화': 'Passive shop · permanent upgrades with AP',
+    '맵 · 판마다 무작위로 나옵니다': 'Maps · a random one every game',
+    '호감도 상점 · 대화 상대의 호감도로 구매': 'Affection shop · paid with your chat partner\'s affection',
+    '무기고 · 무기 해제': 'Armory · unlock weapons',
+    '📖 무기 특성 전체 보기': '📖 All weapon stats',
+    '기록과 업적 포인트는 이 브라우저에 저장됩니다. 시간은 게임 속도와 상관없이 게임 안의 시간으로 잽니다.': 'Your records and AP are saved in this browser. Time is counted in game time, whatever the game speed.',
+    '타워 디펜스 게임판': 'Tower defense game board',
+    '전투 종료': 'Battle over', '성문이 무너졌습니다': 'The gate has fallen', '웨이브 7까지 버텼습니다.': 'You held out until wave 7.',
+    '금화는 사라지고 업적 포인트만 남습니다.': 'Gold disappears; only AP stays.',
+    '같은 난이도 다시': 'Play again', '로비로': 'Lobby',
+    '이지 · 제한 16:00': 'Easy · Limit 16:00',
+    '무기 배치': 'Place weapons', '📖 무기 특성': '📖 Weapon stats',
+    '호감도 아이템 · 한 판에 한 번': 'Affection items · cost 💗 per use',
+    '웨이브 1 시작': 'Start wave 1',
+    '게임 속도': 'Game speed', '일시정지': 'Pause', '무기 특성': 'Weapon stats', '대화 열기': 'Open chat', '로비로 나가기': 'Leave to lobby', '로비': 'Lobby',
+    'keys': '<kbd>1</kbd>–<kbd>7</kbd> Select weapon · <kbd>Space</kbd> Start wave · <kbd>U</kbd> Upgrade · <kbd>X</kbd> Sell · <kbd>I</kbd> Weapon stats · <kbd>P</kbd> Pause · <kbd>Esc</kbd> Cancel',
+    '무기 특성 닫기': 'Close weapon stats', '닫기': 'Close',
+    '대화 상대': 'Chat', '대화': 'Chat', '대화 상대 고르기': 'Choose a chat partner', '함께 수다 떨 사람을 골라 주세요': 'Pick someone to chat with',
+    '상대 바꾸기': 'Switch', '대화 닫기': 'Close chat', '메시지 입력': 'Type a message', '보내기': 'Send',
+  });
+
+  // 게임 데이터
+  const setBy = (arr, map) => { for (const o of arr) if (map[o.id]) Object.assign(o, map[o.id]); };
+  const setKeys = (obj, map) => { for (const k in map) Object.assign(obj[k], map[k]); };
+  setBy(MAPS, { canyon: { name: 'Canyon' }, snake: { name: 'Snake Road' }, stairs: { name: 'Stairs' }, hook: { name: 'Hook' }, zigzag: { name: 'Zigzag' } });
+  setBy(DIFFS, { easy: { name: 'Easy' }, normal: { name: 'Normal' }, hard: { name: 'Hard' }, hell: { name: 'Hell' }, crazy: { name: 'Crazy' } });
+  setBy(PAINTS, { red: { name: 'Red' }, orange: { name: 'Orange' }, yellow: { name: 'Yellow' }, green: { name: 'Green' }, blue: { name: 'Blue' }, indigo: { name: 'Indigo' }, violet: { name: 'Violet' } });
+  setKeys(TOWERS, {
+    police: { name: 'Slingshot', desc: 'Fires small stones in quick succession. Pulls its weight anywhere.' },
+    fire: { name: 'Snail Gun', desc: 'Enemies hit by the sticky jelly slow down. Place it in front of your heavy hitters.' },
+    dump: { name: 'Small Cannon', desc: 'Shells hit everything around where they land.' },
+    bumper: { name: 'Spring Gun', desc: 'Spring power knocks nearby enemies back. Low-HP enemies fly far; tough ones barely budge.' },
+    crane: { name: 'Heavy Cannon', desc: 'Fires heavy shells. Slow, but each hit is huge.' },
+    flume: { name: 'Freeze Gun', desc: 'Blasts cold air that briefly freezes every enemy in range.' },
+    tank: { name: 'Power Slingshot', desc: 'The longest range. Hurls big stones hard from far away.' },
+  });
+  setKeys(ITEMS, {
+    secret1: { name: 'Airplane', desc: 'Flies the whole path from start to end and bombs any enemy below. It never stops for enemies. Costs affection each sortie.' },
+    secret2: { name: 'Fire', desc: 'Lights a fire on one path tile for 1 minute. Enemies passing through catch fire and lose HP for 4 seconds. Costs affection each time you place it.' },
+    secret3: { name: 'Puddle', desc: 'Makes a puddle on one path tile for 1 minute. Enemies passing through are slowed 40% for 3 seconds. Costs affection each time you place it.' },
+  });
+  setKeys(ENEMIES, { grunt: { name: 'Black Taxi' }, runner: { name: 'Black Bumper Car' }, brute: { name: 'Black Dump Truck' }, boss: { name: 'Black Tank' } });
+  setKeys(OBST_TYPES, {
+    rock: { name: 'Rock', desc: 'A huge rock that tumbled down the canyon.' },
+    wreck: { name: 'Wreck', desc: 'A rusty, abandoned junk car.' },
+    cones: { name: 'Construction zone', desc: 'Traffic cones and barriers block the tile.' },
+    puddle: { name: 'Oil puddle', desc: 'Slippery oil has pooled here, so no vehicle can be placed.' },
+    logs: { name: 'Log pile', desc: 'A stack of cut logs.' },
+  });
+  setBy(SKILLS, {
+    dmg: { name: 'Attack power', fmt: v => `All weapons +${v}% damage` },
+    aspd: { name: 'Attack speed', fmt: v => `All weapons +${v}% attack speed` },
+    def: { name: 'Gate defense', fmt: v => `Gate HP +${v} (starts at 20)` },
+    slow: { name: 'Enemy slow', fmt: v => `All enemies −${v}% move speed` },
+    sell: { name: 'Sell refund', fmt: v => `Sell refund +${v} points (base 50%)` },
+    gold: { name: 'Starting gold', fmt: v => `Starting gold +${v} (base 180)` },
+  });
+}
+
+if (IS_EN) Object.assign(EN, {
+    "웨이브 {w} 방어 · 보너스 +{b}": "Wave {w} cleared · bonus +{b}",
+    " · 클리어": " · Cleared",
+    " · 전투 종료": " · Battle over",
+    "업적 포인트 +{n}": "AP +{n}",
+    "클리어! 하지만 시간 초과": "Cleared! But out of time",
+    "클리어 시간 {t} / 제한 {l}": "Clear time {t} / limit {l}",
+    ". 제한 시간 안에 막아냈습니다.": ". You made it within the time limit.",
+    ". 제한 시간을 넘겨 업적 포인트는 없습니다.": ". Over the time limit, so no AP this time.",
+    "웨이브 {w}에서 무너졌습니다. 플레이 시간 {t}.": "The gate fell at wave {w}. Play time {t}.",
+    "금화는 사라지고 업적 포인트만 남습니다. 보유 업적 포인트 {n}.": "Gold disappears; only AP stays. You now have {n} AP.",
+    "적은 여기서 옵니다 ↓": "Enemies come from here ↓",
+    "↓ 성문을 지키세요": "↓ Defend the gate",
+    "적은 여기서 옵니다": "Enemies come from here",
+    "성문을 지키세요": "Defend the gate",
+    "제한": "Limit",
+    "초": "s",
+    "눌러서 업적 포인트로 해제": "Tap to unlock with AP",
+    "웨이브 {n} 진행 중": "Wave {n} running",
+    "▶ 웨이브 {n} · {s}초": "▶ Wave {n} · {s}s",
+    "웨이브 {n} 시작": "Start wave {n}",
+    "계속하기": "Resume",
+    "아이템": "Item",
+    "적이 지나가는 <b>길 칸</b>을 눌러 놓으세요. 놓을 때 호감도 {c}를 쓰고, 1분 동안 유지됩니다.": "Tap a <b>path tile</b> to place it. It costs {c} affection and lasts 1 minute.",
+    "취소": "Cancel",
+    "장애물": "Obstacle",
+    "이 칸에는 무기를 세울 수 없습니다.": "You can't place a weapon on this tile.",
+    "치우면 이 맵에서는 모든 난이도에서 영구히 사라집니다.": "Clear it and it's gone from this map on every difficulty, for good.",
+    "업적 포인트가 {n} 부족합니다.": "You're {n} AP short.",
+    "{c} AP로 치우기": "Clear for {c} AP",
+    "🔒 잠김": "🔒 Locked",
+    "해제하면 이번 판부터 바로 쓸 수 있고, 앞으로도 계속 쓸 수 있습니다.": "Unlock it and you can use it right away, and in every game after.",
+    "업적 포인트가 {n} 부족합니다. 제한 시간 안에 클리어해서 모으세요.": "You're {n} AP short. Clear games within the time limit to earn more.",
+    "{c} AP로 해제": "Unlock for {c} AP",
+    "📖 특성": "📖 Stats",
+    " · 범위": " · area",
+    " · 주변 전체": " · all around",
+    "{n}칸": "{n} tiles",
+    " (보스는 절반)": " (half on bosses)",
+    "길이 아닌 빈 칸을 눌러 배치하세요.": "Tap an empty tile (not on the path) to place it.",
+    "금화가 {n} 부족합니다.": "You're {n} gold short.",
+    "📖 {name} 특성 보기": "📖 {name} stats",
+    " · 최대": " · MAX",
+    "최대 강화": "Max level",
+    "강화": "Upgrade",
+    "설치비와 강화비 합계의 {p}%를 돌려받습니다": "Refunds {p}% of what you spent on building and upgrading",
+    "판매": "Sell",
+    "📖 특성 보기": "📖 Weapon stats",
+    "웨이브 {n} 구성": "Wave {n} lineup",
+    "다음 웨이브 {n}": "Next wave {n}",
+    "적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 {p}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.": "The enemy is a legion of cars painted black. Their HP grows 14.5% every wave, and black tanks arrive on waves 10 and 20. Tap a placed weapon to upgrade it or sell it (you get back {p}% of the gold you put in). Use the 💬 button at the bottom right to chat any time; say a hidden word and a quiz pops up.",
+    "나가면 이번 판은 기록되지 않아요 · 한 번 더 누르기": "Leaving won't record this game · tap again",
+    "나가기?": "Leave?",
+    "패시브": "Passives",
+    "단계": "level",
+    "지금": "Now",
+    "아직 배우지 않음": "Not learned yet",
+    "다음 단계": "Next level",
+    "최대 단계": "Max level",
+    "{c} AP로 {n}단계": "{c} AP → level {n}",
+    "<b>색을 바꿀 무기를 하나 고르세요.</b> 고른 무기는 무기고의 \"보유\" 옆에 색 버튼이 생깁니다.": "<b>Pick a weapon to recolor.</b> Color buttons will appear next to \"Owned\" in the armory.",
+    "고를 수 있는 무기가 없습니다": "No weapon to pick",
+    "{c} AP로 사면 보유한 무기 하나를 골라 빨·주·노·초·파·남·보 중 원하는 색으로 칠할 수 있습니다. 여러 번 사서 무기마다 열 수 있습니다.": "For {c} AP you can pick one weapon you own and paint it any of the seven rainbow colors. Buy it several times to unlock more weapons.",
+    "색을 바꿀 수 있는 무기": "Weapons you can recolor",
+    "{c} AP로 구매": "Buy for {c} AP",
+    "보유한 무기 모두 열림": "All owned weapons unlocked",
+    "무기 색 바꾸기": "Weapon paint",
+    "±맵": "± map",
+    "{n} 시작": "Start {n}",
+    "보유": "Owned",
+    "색": "color",
+    " · 다시 누르면 원래 색": " · tap again to reset",
+    "피해": "Damage",
+    "사거리": "Range",
+    "공격 간격": "Attack interval",
+    "둔화": "Slow",
+    "밀쳐내기": "Knockback",
+    "정지": "Freeze",
+    "웨이브당 채굴": "Mining per wave",
+    "캐낸 금화": "Gold mined",
+    "처치": "Kills",
+    "들인 금화": "Gold spent",
+    "퀴즈 보너스": "Quiz bonus",
+    "제거 비용": "Removal cost",
+    "보유 업적 포인트": "Your AP",
+    "이 맵 남은 장애물": "Obstacles left on this map",
+    "해제 비용": "Unlock cost",
+    "배치 비용": "Placement cost",
+    "길 길이": "Path length",
+    "제한 시간 조정": "Time limit shift",
+    "적 체력·속도": "Enemy HP · speed",
+    "제한 시간": "Time limit",
+    "클리어 보상": "Clear reward",
+    "최고 기록": "Best time",
+    "클리어 / 플레이": "Cleared / played",
+});
+
+if (IS_EN) Object.assign(EN, {
+    "✈️ 출격! -💗{c}": "✈️ Sortie! -💗{c}",
+    "✈️ 비행기 출격!": "✈️ Airplane away!",
+    "{n} 선물이에요! 💝 꼭 필요할 때 써요.": "Here's a gift: {n}! 💝 Use it when you really need it.",
+    "길 칸을 고르세요 · 취소": "Pick a path tile · tap to cancel",
+    "💗 {c}씩 · ": "💗 {c} · ",
+    "1분": "1m",
+    "출격": "launch",
+    "개 놓임": " placed",
+    "대 비행 중": " flying",
+    "{n}의 호감도 {a}": "{n}'s affection: {a}",
+    "대화 상대를 먼저 고르세요": "Pick a chat partner first",
+    "💗 {c}로 구매": "💗 Buy for {c}",
+    "이번 판 사용함": "Used this game",
+    "눌러서 길에 놓기": "Tap to place on the path",
+    "눌러서 출격": "Tap to launch",
+    "{n}의 호감도 · 눌러서 대화": "{n}'s affection · tap to chat",
+    "상대 없음": "No partner",
+    "지금 대화 상대 <b>{n}</b>의 호감도: <b>💗 {a}</b>. 대화할수록 천천히 오릅니다.": "Your chat partner <b>{n}</b>'s affection: <b>💗 {a}</b>. It rises slowly as you chat.",
+    "오른쪽 아래 💬 버튼에서 대화 상대를 먼저 고르세요. 대화할수록 호감도가 천천히 오릅니다.": "Use the 💬 button at the bottom right to pick a chat partner first. Affection rises slowly as you chat.",
+    "게임 중 놓을 때마다 💗 {c} · 1분 지속": "Each time you place it in a game: 💗 {c} · lasts 1 min",
+    "게임 중 출격할 때마다 💗 {c}": "Each sortie in a game: 💗 {c}",
+    "보유 · 한 판에 한 번": "Owned · once per game",
+    "표의 수치는 패시브·퀴즈 보너스를 빼고 레벨별 기본값입니다. 초당 피해는 적 한 대를 맞혔을 때 기준입니다.": "Numbers are base values per level, without passive or quiz bonuses. Damage per second assumes every shot hits one enemy.",
+    "지금 적용 중인 패시브": "Active passives",
+    "폭발 반경": "Blast radius",
+    "초당 피해": "Damage / sec",
+    "밀어내기 (검은 택시 기준)": "Knockback (vs Black Taxi)",
+    "강화 비용": "Upgrade cost",
+    "총체력에 따라 밀리는 거리": "Knockback distance by max HP",
+    "먼저 대화 상대를 골라 주세요": "Pick a chat partner first",
+    "금화 +{n}": "Gold +{n}",
+    "바로 받아서 무기를 더 세워요": "Get it now and build more weapons",
+    "적 속도 20% 감소": "Enemy speed −20%",
+    "전투 중 30초 동안 모든 적이 느려져요": "Every enemy slows down for 30 seconds",
+    "모든 무기 공격력 +10%": "All weapons +10% damage",
+    "이번 판이 끝날 때까지 적용돼요": "Lasts until this game ends",
+    "보기 중에서 정답을 골라 주세요": "Pick the right answer",
+    "선물을 하나 골라 주세요": "Pick one gift",
+    "{n}에게 말하기": "Message {n}",
+});
+
+if (IS_EN) Object.assign(EN, {
+    "그거": "that",
+    "지금은 로비예요. 업적 포인트는 {a} AP 있어요. 난이도를 골라 출동해 보세요!": "We're in the lobby. You have {a} AP. Pick a difficulty and roll out!",
+    "{d} · {m} 맵, 웨이브 {w}/20, 금화 {g}, 성문 내구도 {l}, 시간 {t} / {lim}이에요.": "{d} · {m} map, wave {w}/20, {g} gold, gate HP {l}, time {t} / {lim}.",
+    "아직 게임 전이에요. 시작하면 알려 줄게요.": "The game hasn't started yet. I'll tell you once it does.",
+    "웨이브 {w}: ": "Wave {w}: ",
+    "{name} {n}대": "{n}× {name}",
+    " — 보스 웨이브예요!": " — it's a boss wave!",
+    "업적 포인트는 지금 {a} AP예요.": "You have {a} AP right now.",
+    "맵은 5종이고 판마다 무작위로 나와요.": "There are 5 maps, picked at random every game.",
+    "이번 맵은 {m}, 길이 {n}칸이에요.": "This map is {m}, {n} tiles long.",
+    "지금은 {c}이에요.": "It's {c} right now.",
+    "오늘 협곡에 바람이 꽤 불어요 🍃": "A strong wind is blowing through the canyon today 🍃",
+    "성문 쪽은 해가 잘 들어서 따뜻해요": "It's warm and sunny near the gate",
+    "비가 오면 웅덩이가 더 커지려나요?": "If it rains, will the puddles get bigger?",
+    "오, \"{x}\"! 그 말 기다리고 있었어요. 게임 시작하면 그때 퀴즈 낼게요 🎁": "Oh, \"{x}\"! I was waiting for that word. Start a game and I'll give you a quiz 🎁",
+    "어? 방금 \"{x}\"라고 했죠! 그 말 기다리고 있었어요 😆": "Oh? You just said \"{x}\"! I was waiting for that 😆",
+    "퀴즈 하나 낼게요. 맞히면 선물 줄게요 🎁": "Here's a quiz. Get it right and I'll give you a gift 🎁",
+    "퀴즈는 다음 웨이브 막고 나서 또 낼게요!": "I'll give you another quiz after you clear the next wave!",
+    "퀴즈요? 그냥은 안 내요 😏 수다 떨다 보면 갑자기 생각날지도?": "A quiz? Not just like that 😏 Keep chatting and one might pop into my head!",
+    "우리 호감도가 {ms}이 됐어요! 💗 {rest}": "Our affection reached {ms}! 💗 {rest}",
+    "호감도 상점에서 선물을 고를 수 있어요.": "You can spend it on items now.",
+    "더 친해지면 선물을 줄게요.": "Get closer and I'll give you gifts.",
+    "정답! 👏 선물 하나 골라 보세요.": "Correct! 👏 Pick a gift.",
+    "정답! 그런데 그 판은 이미 끝났네요. 다음엔 꼭 선물 줄게요.": "Correct! But that game is already over. Next time I'll definitely give you a gift.",
+    "땡! 정답은 <b>{a}</b>였어요 😅": "Nope! The answer was <b>{a}</b> 😅",
+    "금화 {n}개 보냈어요 💸": "Sent you {n} gold 💸",
+    "적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.": "I let some air out of the enemies' tires haha they'll be slow for 30 seconds.",
+    "무기들한테 힘 좀 실어 줬어요! 이번 판 동안 더 세게 쏠 거예요 💪": "I gave your weapons a boost! They'll hit harder for this game 💪",
+    "아쉽게도 그 판은 끝났어요. 다음 판에 또 도전해요!": "Too bad, that game is over. Let's try again next game!",
+    "다음 웨이브 막고 나면 또 퀴즈 낼 수 있어요. 그때까지 수다 떨어요 ㅎㅎ": "I can give you another quiz after the next wave. Until then, let's keep chatting haha",
+    "웨이브 {w} 막았다! 🎉 수다 떨다 보면 또 퀴즈가 생각날지도?": "Wave {w} cleared! 🎉 Keep chatting and another quiz might come to mind!",
+});
+
+// 고정 화면(HTML)의 글자를 영어로 바꿉니다. data-t 가 붙은 덩어리는 EN[그 이름]으로 통째로, 나머지는 글자 하나하나를 바꿉니다.
+function i18nDom() {
+  document.documentElement.lang = LANG;
+  document.title = tr('협곡 방어전');
+  if (!IS_EN) return;
+  for (const el of document.querySelectorAll('[data-t]')) { const v = EN[el.dataset.t]; if (v !== undefined) el.innerHTML = v; }
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: n => (n.parentNode.closest('[data-t],script,style') || !/[가-힣]/.test(n.nodeValue)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
+  for (const n of nodes) { const k = n.nodeValue.trim(); if (EN[k] !== undefined) n.nodeValue = n.nodeValue.replace(k, () => EN[k]); }
+  for (const el of document.querySelectorAll('[aria-label],[placeholder],[title]')) for (const a of ['aria-label', 'placeholder', 'title']) { const v = el.getAttribute(a); if (v && EN[v] !== undefined) el.setAttribute(a, EN[v]); }
+}
+i18nDom();
+{
+  const lb = document.getElementById('langBtn');
+  lb.textContent = IS_EN ? '🌐 한국어' : '🌐 English';
+  lb.addEventListener('click', () => { try { localStorage.setItem(LANG_KEY, IS_EN ? 'ko' : 'en'); } catch (err) { /* ignore */ } location.reload(); });
+}
+
 // 장애물은 무기를 놓기 가장 좋은 칸, 즉 사거리(2.6칸) 안에 길이 가장 많이 들어오는 칸부터 막습니다.
 const layoutCache = {};
 function cellValue(m, c, r) {
@@ -1246,7 +1528,7 @@ function update(dt) {
   if (S.waveActive && !S.queue.length && !S.enemies.length) {
     S.waveActive = false;
     const bonus = 20 + S.wave * 3; S.gold += bonus;
-    floatText(W / 2, H / 2, '웨이브 ' + S.wave + ' 방어 · 보너스 +' + bonus, '#e2b54a');
+    floatText(W / 2, H / 2, tr('웨이브 {w} 방어 · 보너스 +{b}', { w: S.wave, b: bonus }), '#e2b54a');
     S.fx[S.fx.length - 1].life = S.fx[S.fx.length - 1].max = 2;
     onWaveCleared();
     if (S.wave >= MAX_WAVE) { endGame(true); return; }
@@ -1266,12 +1548,12 @@ function endGame(won) {
     if (S.time <= limitOf(D, MAP)) { earned = D.ap; prog.ap += earned; }
   }
   saveProg();
-  $('ovEyebrow').textContent = D.name + ' · ' + MAP.name + (won ? ' · 클리어' : ' · 전투 종료');
-  $('ovTitle').textContent = won ? (earned ? '업적 포인트 +' + earned : '클리어! 하지만 시간 초과') : '성문이 무너졌습니다';
+  $('ovEyebrow').textContent = D.name + ' · ' + MAP.name + (won ? tr(' · 클리어') : tr(' · 전투 종료'));
+  $('ovTitle').textContent = won ? (earned ? tr('업적 포인트 +{n}', { n: earned }) : tr('클리어! 하지만 시간 초과')) : tr('성문이 무너졌습니다');
   $('ovText').textContent = won
-    ? '클리어 시간 ' + mmss(S.time) + ' / 제한 ' + mmss(limitOf(D, MAP)) + (earned ? '. 제한 시간 안에 막아냈습니다.' : '. 제한 시간을 넘겨 업적 포인트는 없습니다.')
-    : '웨이브 ' + S.wave + '에서 무너졌습니다. 플레이 시간 ' + mmss(S.time) + '.';
-  $('ovNote').textContent = '금화는 사라지고 업적 포인트만 남습니다. 보유 업적 포인트 ' + prog.ap + '.';
+    ? tr('클리어 시간 {t} / 제한 {l}', { t: mmss(S.time), l: mmss(limitOf(D, MAP)) }) + (earned ? tr('. 제한 시간 안에 막아냈습니다.') : tr('. 제한 시간을 넘겨 업적 포인트는 없습니다.'))
+    : tr('웨이브 {w}에서 무너졌습니다. 플레이 시간 {t}.', { w: S.wave, t: mmss(S.time) });
+  $('ovNote').textContent = tr('금화는 사라지고 업적 포인트만 남습니다. 보유 업적 포인트 {n}.', { n: prog.ap });
   $('overlay').hidden = false;
 }
 
@@ -1368,12 +1650,12 @@ function render() {
   }
   if (S.wave === 0 && !S.waveActive) {
     ctx.font = '500 13px "IBM Plex Sans KR", sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(235,230,211,.8)';
-    if (ROT) { ctx.textAlign = 'center'; ctxText('fillText', '적은 여기서 옵니다 ↓', 18, PTS[0].y); ctxText('fillText', '↓ 성문을 지키세요', W - 70, PTS[PTS.length - 1].y); }
-    else { ctx.fillText('적은 여기서 옵니다', 34, PTS[0].y - 34); ctx.textAlign = 'right'; ctx.fillText('성문을 지키세요', W - 34, PTS[PTS.length - 1].y - 60); }
+    if (ROT) { ctx.textAlign = 'center'; ctxText('fillText', tr('적은 여기서 옵니다 ↓'), 18, PTS[0].y); ctxText('fillText', tr('↓ 성문을 지키세요'), W - 70, PTS[PTS.length - 1].y); }
+    else { ctx.fillText(tr('적은 여기서 옵니다'), 34, PTS[0].y - 34); ctx.textAlign = 'right'; ctx.fillText(tr('성문을 지키세요'), W - 34, PTS[PTS.length - 1].y - 60); }
   }
   if (paused && !S.over) {
     ctx.fillStyle = 'rgba(8,14,12,.5)'; ctx.fillRect(0, 0, W, H);
-    ctx.font = '400 44px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctxText('fillText', '일시정지', W / 2, H / 2 + 14);
+    ctx.font = '400 44px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctxText('fillText', IS_EN ? 'Paused' : '일시정지', W / 2, H / 2 + 14);
   }
 }
 
@@ -1415,7 +1697,7 @@ function refreshUI() {
   $('sAP').textContent = prog.ap;
   if (inLobby) return;
   const D = DIFFS[S.diff];
-  $('sDiff').textContent = D.name + ' · ' + MAP.name + ' · 제한 ' + mmss(limitOf(D, MAP));
+  $('sDiff').textContent = D.name + ' · ' + MAP.name + ' · ' + tr('제한') + ' ' + mmss(limitOf(D, MAP));
   $('sTime').textContent = mmss(S.time);
   $('sTimeBox').classList.toggle('late', S.time > limitOf(D, MAP));
   $('sWave').textContent = S.wave + (ROT ? '/' : ' / ') + MAX_WAVE; // 휴대폰에서는 두 자리 웨이브도 칸에 들어가게 띄어쓰기를 뺍니다
@@ -1424,7 +1706,7 @@ function refreshUI() {
   $('sLives').textContent = S.lives;
   $('sLivesBox').classList.toggle('low', S.lives <= 5);
   $('sSlowBox').hidden = !(S.slowAll > 0);
-  $('sSlow').textContent = Math.ceil(S.slowAll) + '초';
+  $('sSlow').textContent = Math.ceil(S.slowAll) + tr('초');
   for (const b of shop.children) {
     const t = b.dataset.type;
     b.setAttribute('aria-pressed', String(build === t));
@@ -1433,63 +1715,63 @@ function refreshUI() {
     if (b.classList.contains('locked') !== lock) {
       b.classList.toggle('locked', lock);
       b.querySelector('.cost').textContent = lock ? '🔒 ' + TOWERS[t].ap + ' AP' : TOWERS[t].cost;
-      b.title = lock ? '눌러서 업적 포인트로 해제' : '';
+      b.title = lock ? tr('눌러서 업적 포인트로 해제') : '';
     }
   }
   const sb = $('startBtn');
   sb.disabled = S.waveActive || S.over || S.wave >= MAX_WAVE;
-  sb.textContent = S.waveActive ? '웨이브 ' + S.wave + ' 진행 중' : S.autoT > 0 ? '▶ 웨이브 ' + (S.wave + 1) + ' · ' + Math.ceil(S.autoT) + '초' : '웨이브 ' + (S.wave + 1) + ' 시작';
+  sb.textContent = S.waveActive ? tr('웨이브 {n} 진행 중', { n: S.wave }) : S.autoT > 0 ? tr('▶ 웨이브 {n} · {s}초', { n: S.wave + 1, s: Math.ceil(S.autoT) }) : tr('웨이브 {n} 시작', { n: S.wave + 1 });
   $('speedBtn').innerHTML = `<span class="mono">${speed}×</span>`;
   $('pauseBtn').textContent = paused ? '▶' : '❚❚';
-  $('pauseBtn').setAttribute('aria-label', paused ? '계속하기' : '일시정지');
+  $('pauseBtn').setAttribute('aria-label', paused ? tr('계속하기') : tr('일시정지'));
 
   let key, html;
   if (itemPlace) {
     const it = ITEMS[itemPlace];
     key = 'p' + itemPlace;
-    html = `<h3>${it.name} <span class="lv">아이템</span></h3><p>${it.desc}</p><p>적이 지나가는 <b>길 칸</b>을 눌러 놓으세요. 놓을 때 호감도 ${ITEM_COST}를 쓰고, 1분 동안 유지됩니다.</p>
-      <div class="row"><button class="btn grow" type="button" data-act="cancel">취소</button></div>`;
+    html = `<h3>${it.name} <span class="lv">${tr('아이템')}</span></h3><p>${it.desc}</p><p>${tr('적이 지나가는 <b>길 칸</b>을 눌러 놓으세요. 놓을 때 호감도 {c}를 쓰고, 1분 동안 유지됩니다.', { c: ITEM_COST })}</p>
+      <div class="row"><button class="btn grow" type="button" data-act="cancel">${tr('취소')}</button></div>`;
   } else if (obsView && S.obst.has(obsView)) {
     const o = S.obst.get(obsView), od = OBST_TYPES[o.type], can = prog.ap >= CLEAR_COST;
     key = 'o' + obsView + prog.ap;
-    html = `<h3>${od.name} <span class="lv">장애물</span></h3><p>${od.desc} 이 칸에는 무기를 세울 수 없습니다.</p>
-      <dl class="kv"><dt>제거 비용</dt><dd>${CLEAR_COST} AP</dd><dt>보유 업적 포인트</dt><dd>${prog.ap} AP</dd><dt>이 맵 남은 장애물</dt><dd>${S.obst.size}개</dd></dl>
-      <p>${can ? '치우면 이 맵에서는 모든 난이도에서 영구히 사라집니다.' : '업적 포인트가 ' + (CLEAR_COST - prog.ap) + ' 부족합니다.'}</p>
-      <div class="row"><button class="btn primary grow" type="button" data-act="clear" ${can ? '' : 'disabled'}>${CLEAR_COST} AP로 치우기</button><button class="btn" type="button" data-act="cancel">닫기</button></div>`;
+    html = `<h3>${od.name} <span class="lv">${tr('장애물')}</span></h3><p>${od.desc} ${tr('이 칸에는 무기를 세울 수 없습니다.')}</p>
+      <dl class="kv"><dt>${tr('제거 비용')}</dt><dd>${CLEAR_COST} AP</dd><dt>${tr('보유 업적 포인트')}</dt><dd>${prog.ap} AP</dd><dt>${tr('이 맵 남은 장애물')}</dt><dd>${S.obst.size}</dd></dl>
+      <p>${can ? tr('치우면 이 맵에서는 모든 난이도에서 영구히 사라집니다.') : tr('업적 포인트가 {n} 부족합니다.', { n: CLEAR_COST - prog.ap })}</p>
+      <div class="row"><button class="btn primary grow" type="button" data-act="clear" ${can ? '' : 'disabled'}>${tr('{c} AP로 치우기', { c: CLEAR_COST })}</button><button class="btn" type="button" data-act="cancel">${tr('닫기')}</button></div>`;
   } else if (lockView) {
     const d = TOWERS[lockView], can = prog.ap >= d.ap;
     key = 'l' + lockView + prog.ap;
-    html = `<h3>${d.name} <span class="lv">🔒 잠김</span></h3><p>${d.desc}</p>
-      <dl class="kv"><dt>해제 비용</dt><dd>${d.ap} AP</dd><dt>보유 업적 포인트</dt><dd>${prog.ap} AP</dd><dt>배치 비용</dt><dd>${d.cost} 금화</dd></dl>
-      <p>${can ? '해제하면 이번 판부터 바로 쓸 수 있고, 앞으로도 계속 쓸 수 있습니다.' : '업적 포인트가 ' + (d.ap - prog.ap) + ' 부족합니다. 제한 시간 안에 클리어해서 모으세요.'}</p>
-      <div class="row"><button class="btn primary grow" type="button" data-act="unlock" ${can ? '' : 'disabled'}>${d.ap} AP로 해제</button><button class="btn" type="button" data-act="guide">📖 특성</button><button class="btn" type="button" data-act="cancel">닫기</button></div>`;
+    html = `<h3>${d.name} <span class="lv">${tr('🔒 잠김')}</span></h3><p>${d.desc}</p>
+      <dl class="kv"><dt>${tr('해제 비용')}</dt><dd>${d.ap} AP</dd><dt>${tr('보유 업적 포인트')}</dt><dd>${prog.ap} AP</dd><dt>${tr('배치 비용')}</dt><dd>${d.cost} ${tr('금화')}</dd></dl>
+      <p>${can ? tr('해제하면 이번 판부터 바로 쓸 수 있고, 앞으로도 계속 쓸 수 있습니다.') : tr('업적 포인트가 {n} 부족합니다. 제한 시간 안에 클리어해서 모으세요.', { n: d.ap - prog.ap })}</p>
+      <div class="row"><button class="btn primary grow" type="button" data-act="unlock" ${can ? '' : 'disabled'}>${tr('{c} AP로 해제', { c: d.ap })}</button><button class="btn" type="button" data-act="guide">${tr('📖 특성')}</button><button class="btn" type="button" data-act="cancel">${tr('닫기')}</button></div>`;
   } else if (build) {
     const d = TOWERS[build];
     key = 'b' + build + (S.gold >= d.cost);
-    html = `<h3>${d.name} <span class="lv">${d.cost} 금화</span></h3><p>${d.desc}</p>
-      <dl class="kv">${d.income ? `<dt>웨이브당 채굴</dt><dd>${d.income}</dd>` : `<dt>피해</dt><dd>${d.dmg}${d.splash ? ' · 범위' : ''}${d.pulse ? ' · 주변 전체' : ''}</dd><dt>사거리</dt><dd>${d.range} 칸</dd><dt>공격 간격</dt><dd>${d.rate}초</dd>`}${d.slow ? `<dt>둔화</dt><dd>${Math.round(d.slow * 100)}% · ${d.slowDur}초</dd>` : ''}${d.knock ? `<dt>밀쳐내기</dt><dd>${d.knock} 칸</dd>` : ''}${d.freeze ? `<dt>정지</dt><dd>${d.freeze}초 (보스는 절반)</dd>` : ''}</dl>
-      <p>${S.gold >= d.cost ? '길이 아닌 빈 칸을 눌러 배치하세요.' : '금화가 ' + (d.cost - S.gold) + ' 부족합니다.'}</p>
-      <div class="row"><button class="btn grow" type="button" data-act="guide">📖 ${d.name} 특성 보기</button><button class="btn" type="button" data-act="cancel">취소</button></div>`;
+    html = `<h3>${d.name} <span class="lv">${d.cost} ${tr('금화')}</span></h3><p>${d.desc}</p>
+      <dl class="kv">${d.income ? `<dt>${tr('웨이브당 채굴')}</dt><dd>${d.income}</dd>` : `<dt>${tr('피해')}</dt><dd>${d.dmg}${d.splash ? tr(' · 범위') : ''}${d.pulse ? tr(' · 주변 전체') : ''}</dd><dt>${tr('사거리')}</dt><dd>${tr('{n}칸', { n: d.range })}</dd><dt>${tr('공격 간격')}</dt><dd>${d.rate}${tr('초')}</dd>`}${d.slow ? `<dt>${tr('둔화')}</dt><dd>${Math.round(d.slow * 100)}% · ${d.slowDur}${tr('초')}</dd>` : ''}${d.knock ? `<dt>${tr('밀쳐내기')}</dt><dd>${tr('{n}칸', { n: d.knock })}</dd>` : ''}${d.freeze ? `<dt>${tr('정지')}</dt><dd>${d.freeze}${tr('초')}${tr(' (보스는 절반)')}</dd>` : ''}</dl>
+      <p>${S.gold >= d.cost ? tr('길이 아닌 빈 칸을 눌러 배치하세요.') : tr('금화가 {n} 부족합니다.', { n: d.cost - S.gold })}</p>
+      <div class="row"><button class="btn grow" type="button" data-act="guide">${tr('📖 {name} 특성 보기', { name: d.name })}</button><button class="btn" type="button" data-act="cancel">${tr('취소')}</button></div>`;
   } else if (sel) {
     const st = stats(sel), d = TOWERS[sel.type], max = sel.lv >= 3, c = max ? 0 : upCost(sel);
     const nx = max ? null : stats({ type: sel.type, lv: sel.lv + 1, buff: sel.buff });
     key = 's' + S.towers.indexOf(sel) + (sel.buff || 1) + '|' + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c) + '|' + (sel.unread || 0);
     const up = (a, b) => nx ? ` <span class="up">→ ${b}</span>` : '';
-    html = `<h3>${d.name} <span class="lv">Lv.${sel.lv}${max ? ' · 최대' : ''}</span></h3>
-      <dl class="kv">${st.income ? `<dt>웨이브당 채굴</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>캐낸 금화</dt><dd>${sel.earned || 0}</dd>` : `<dt>피해</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>사거리</dt><dd>${fmt(st.range / T)} 칸${up(0, nx && fmt(nx.range / T))}</dd><dt>공격 간격</dt><dd>${st.rate.toFixed(2)}초${up(0, nx && nx.rate.toFixed(2))}</dd>
-      ${st.slow ? `<dt>둔화</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.freeze ? `<dt>정지</dt><dd>${st.freeze.toFixed(1)}초${up(0, nx && nx.freeze.toFixed(1) + '초')}</dd>` : ''}${st.knock ? `<dt>밀쳐내기</dt><dd>${fmt(st.knock / T)} 칸${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
-      <dt>처치</dt><dd>${sel.kills}</dd>`}<dt>들인 금화</dt><dd>${sel.invested}</dd>${sel.buff > 1 ? `<dt>퀴즈 보너스</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
-      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? '최대 강화' : '강화 <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="설치비와 강화비 합계의 ${Math.round(sellRate() * 100)}%를 돌려받습니다">판매 <span class="mono">+${refund(sel)}</span></button></div>
-      <button class="btn" type="button" data-act="guide">📖 특성 보기</button>`;
+    html = `<h3>${d.name} <span class="lv">Lv.${sel.lv}${max ? tr(' · 최대') : ''}</span></h3>
+      <dl class="kv">${st.income ? `<dt>${tr('웨이브당 채굴')}</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>${tr('캐낸 금화')}</dt><dd>${sel.earned || 0}</dd>` : `<dt>${tr('피해')}</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>${tr('사거리')}</dt><dd>${tr('{n}칸', { n: fmt(st.range / T) })}${up(0, nx && fmt(nx.range / T))}</dd><dt>${tr('공격 간격')}</dt><dd>${st.rate.toFixed(2)}${tr('초')}${up(0, nx && nx.rate.toFixed(2))}</dd>
+      ${st.slow ? `<dt>${tr('둔화')}</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.freeze ? `<dt>${tr('정지')}</dt><dd>${st.freeze.toFixed(1)}${tr('초')}${up(0, nx && nx.freeze.toFixed(1) + tr('초'))}</dd>` : ''}${st.knock ? `<dt>${tr('밀쳐내기')}</dt><dd>${tr('{n}칸', { n: fmt(st.knock / T) })}${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
+      <dt>${tr('처치')}</dt><dd>${sel.kills}</dd>`}<dt>${tr('들인 금화')}</dt><dd>${sel.invested}</dd>${sel.buff > 1 ? `<dt>${tr('퀴즈 보너스')}</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
+      <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? tr('최대 강화') : tr('강화') + ' <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="${tr('설치비와 강화비 합계의 {p}%를 돌려받습니다', { p: Math.round(sellRate() * 100) })}">${tr('판매')} <span class="mono">+${refund(sel)}</span></button></div>
+      <button class="btn" type="button" data-act="guide">${tr('📖 특성 보기')}</button>`;
   } else {
     const nextW = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1));
     const counts = {}; for (const q of buildWave(nextW)) counts[q.type] = (counts[q.type] || 0) + 1;
     key = 'i' + nextW + S.waveActive;
-    html = `<h3>${S.waveActive ? '웨이브 ' + nextW + ' 구성' : '다음 웨이브 ' + nextW}</h3>
+    html = `<h3>${S.waveActive ? tr('웨이브 {n} 구성', { n: nextW }) : tr('다음 웨이브 {n}', { n: nextW })}</h3>
       <div class="wave-list">${Object.entries(counts).map(([k, n]) => `<div><span><i class="dot" style="background:#26262b;box-shadow:0 0 0 1px #6b6b70"></i>${ENEMIES[k].name}</span><span>×${n}</span></div>`).join('')}</div>
-      <p class="tip">적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 ${Math.round(sellRate() * 100)}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.</p>${passiveSummary()}`;
+      <p class="tip">${tr('적군은 검게 칠한 차량 군단입니다. 체력은 웨이브마다 14.5%씩 오르고, 10번째와 20번째 웨이브에는 검은 탱크가 옵니다. 세워 둔 무기를 누르면 강화하거나 판매(들인 금화의 {p}%)할 수 있습니다. 오른쪽 아래 💬 버튼으로 언제든 대화 상대와 수다를 떨 수 있고, 숨은 말을 꺼내면 퀴즈가 나옵니다.', { p: Math.round(sellRate() * 100) })}</p>${passiveSummary()}`;
   }
-  if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html + '<button class="btn sheet-x m-only" type="button" data-act="close">닫기</button>'; }
+  if (key !== panelKey) { panelKey = key; $('panel').innerHTML = html + '<button class="btn sheet-x m-only" type="button" data-act="close">' + tr('닫기') + '</button>'; }
   const sheet = !!(sel || lockView || (obsView && S.obst.has(obsView)));
   $('panel').classList.toggle('sheet', sheet);
   // 휴대폰에서는 창이 맵을 가리지 않도록 맵 바로 아래부터 화면 끝까지만 차지합니다.
@@ -1513,7 +1795,7 @@ $('pauseBtn').addEventListener('click', () => { paused = !paused; });
 $('restartBtn').addEventListener('click', () => startGame(S.diff));
 $('ovLobbyBtn').addEventListener('click', showLobby);
 let leaveArmed = 0;
-const LEAVE_LABEL = { lobbyBtn: ['로비로 나가기', '나가면 이번 판은 기록되지 않아요 · 한 번 더 누르기'], lobbyBtnM: ['로비', '나가기?'] };
+const LEAVE_LABEL = { lobbyBtn: [tr('로비로 나가기'), tr('나가면 이번 판은 기록되지 않아요 · 한 번 더 누르기')], lobbyBtnM: [tr('로비'), tr('나가기?')] };
 function resetLeaveLabels() { for (const id in LEAVE_LABEL) $(id).textContent = LEAVE_LABEL[id][0]; }
 function onLeave(id) {
   if (S.wave === 0 || S.over || leaveArmed > performance.now()) { leaveArmed = 0; resetLeaveLabels(); showLobby(); return; }
@@ -1542,15 +1824,15 @@ function startGame(i) {
 }
 function passiveSummary() {
   const on = SKILLS.filter(k => skillLv(k.id) > 0);
-  return on.length ? `<p class="passives">패시브: ${on.map(k => `<b>${k.fmt(skillVal(k.id))}</b>`).join(' · ')}</p>` : '';
+  return on.length ? `<p class="passives">${tr('패시브')}: ${on.map(k => `<b>${k.fmt(skillVal(k.id))}</b>`).join(' · ')}</p>` : '';
 }
 function renderSkills() {
   $('skills').innerHTML = SKILLS.map(k => {
     const lv = skillLv(k.id), maxed = lv >= k.max, cost = k.base * (lv + 1), can = !maxed && prog.ap >= cost;
     return `<div class="scard"><div class="ic" aria-hidden="true">${k.icon}</div><div>
-      <div class="nm"><span>${k.name}</span><span class="pips" aria-label="${lv}/${k.max}단계">${Array.from({ length: k.max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</span></div>
-      <div class="ds">${lv ? `지금: <b>${k.fmt(lv * k.per)}</b>` : '아직 배우지 않음'}${maxed ? '' : `<br>다음 단계: ${k.fmt((lv + 1) * k.per)}`}</div>
-      ${maxed ? '<span class="owned">최대 단계</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-skill="${k.id}" ${can ? '' : 'disabled'}>${cost} AP로 ${lv + 1}단계</button>`}
+      <div class="nm"><span>${k.name}</span><span class="pips" aria-label="${lv}/${k.max} ${tr('단계')}">${Array.from({ length: k.max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</span></div>
+      <div class="ds">${lv ? `${tr('지금')}: <b>${k.fmt(lv * k.per)}</b>` : tr('아직 배우지 않음')}${maxed ? '' : `<br>${tr('다음 단계')}: ${k.fmt((lv + 1) * k.per)}`}</div>
+      ${maxed ? '<span class="owned">' + tr('최대 단계') + '</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-skill="${k.id}" ${can ? '' : 'disabled'}>${tr('{c} AP로 {n}단계', { c: cost, n: lv + 1 })}</button>`}
     </div></div>`;
   }).join('') + paintCard();
 }
@@ -1559,21 +1841,21 @@ function paintCard() {
   const can = prog.ap >= PAINT_COST && free.length > 0;
   let body;
   if (prog.paintTokens > 0) {
-    body = `<div class="ds"><b>색을 바꿀 무기를 하나 고르세요.</b> 고른 무기는 무기고의 "보유" 옆에 색 버튼이 생깁니다.</div>
-      <div class="pick">${free.map(t => `<button class="btn sm" type="button" data-paintpick="${t}">${TOWERS[t].name}</button>`).join('') || '<span class="owned">고를 수 있는 무기가 없습니다</span>'}</div>`;
+    body = `<div class="ds">${tr('<b>색을 바꿀 무기를 하나 고르세요.</b> 고른 무기는 무기고의 "보유" 옆에 색 버튼이 생깁니다.')}</div>
+      <div class="pick">${free.map(t => `<button class="btn sm" type="button" data-paintpick="${t}">${TOWERS[t].name}</button>`).join('') || '<span class="owned">' + tr('고를 수 있는 무기가 없습니다') + '</span>'}</div>`;
   } else {
-    body = `<div class="ds">${PAINT_COST} AP로 사면 보유한 무기 하나를 골라 빨·주·노·초·파·남·보 중 원하는 색으로 칠할 수 있습니다. 여러 번 사서 무기마다 열 수 있습니다.${slots.length ? `<br>색을 바꿀 수 있는 무기: <b>${slots.map(t => TOWERS[t].name).join(', ')}</b>` : ''}</div>
-      ${free.length ? `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-paintbuy ${can ? '' : 'disabled'}>${PAINT_COST} AP로 구매</button>` : '<span class="owned">보유한 무기 모두 열림</span>'}`;
+    body = `<div class="ds">${tr('{c} AP로 사면 보유한 무기 하나를 골라 빨·주·노·초·파·남·보 중 원하는 색으로 칠할 수 있습니다. 여러 번 사서 무기마다 열 수 있습니다.', { c: PAINT_COST })}${slots.length ? `<br>${tr('색을 바꿀 수 있는 무기')}: <b>${slots.map(t => TOWERS[t].name).join(', ')}</b>` : ''}</div>
+      ${free.length ? `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-paintbuy ${can ? '' : 'disabled'}>${tr('{c} AP로 구매', { c: PAINT_COST })}</button>` : '<span class="owned">' + tr('보유한 무기 모두 열림') + '</span>'}`;
   }
   return `<div class="scard paint"><div class="ic" aria-hidden="true">🎨</div><div>
-    <div class="nm"><span>무기 색 바꾸기</span><span class="dlv">${PAINT_COST} AP</span></div>${body}</div></div>`;
+    <div class="nm"><span>${tr('무기 색 바꾸기')}</span><span class="dlv">${PAINT_COST} AP</span></div>${body}</div></div>`;
 }
 function renderMaps() {
   const box = $('maps'); box.innerHTML = '';
   MAPS.forEach((m, i) => {
     const left = buildObstacles(i).size, tiles = Math.round(m.len / T);
     const c = document.createElement('div'); c.className = 'mcard';
-    c.innerHTML = `<canvas width="320" height="200" aria-hidden="true"></canvas><div class="mname">${m.name}</div><dl class="kv"><dt>길 길이</dt><dd>${tiles}칸</dd><dt>제한 시간 조정</dt><dd>${tiles >= 32 ? '+' : '−'}${mmss(Math.abs((tiles - 32) * 12))}</dd><dt>장애물</dt><dd>${left} / ${OBST_COUNT}</dd></dl>`;
+    c.innerHTML = `<canvas width="320" height="200" aria-hidden="true"></canvas><div class="mname">${m.name}</div><dl class="kv"><dt>${tr('길 길이')}</dt><dd>${tr('{n}칸', { n: tiles })}</dd><dt>${tr('제한 시간 조정')}</dt><dd>${tiles >= 32 ? '+' : '−'}${mmss(Math.abs((tiles - 32) * 12))}</dd><dt>${tr('장애물')}</dt><dd>${left} / ${OBST_COUNT}</dd></dl>`;
     const g = c.querySelector('canvas').getContext('2d'), k = 320 / W;
     g.fillStyle = '#22372a'; g.fillRect(0, 0, 320, 200);
     g.strokeStyle = '#a98b5a'; g.lineWidth = T * .8 * k; g.lineJoin = 'miter'; g.beginPath(); m.pts.forEach((pt, j) => j ? g.lineTo(pt.x * k, pt.y * k) : g.moveTo(pt.x * k, pt.y * k)); g.stroke();
@@ -1588,17 +1870,17 @@ function renderLobby() {
   $('diffs').innerHTML = DIFFS.map((D, i) => {
     const r = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
     return `<div class="dcard" style="--dc:${D.color}">
-      <div class="dtop"><span class="dname">${D.name}</span><span class="dlv">단계 ${i + 1}</span></div>
-      <dl class="kv"><dt>적 체력·속도</dt><dd>×${dmult(i).toFixed(2)}</dd><dt>제한 시간</dt><dd>${mmss(D.limit)} ±맵</dd><dt>클리어 보상</dt><dd>+${D.ap} AP</dd><dt>최고 기록</dt><dd>${r.best == null ? '—' : mmss(r.best)}</dd><dt>클리어 / 플레이</dt><dd>${r.clears} / ${r.plays}</dd></dl>
-      <button class="btn primary" type="button" data-diff="${i}">${D.name} 시작</button>
+      <div class="dtop"><span class="dname">${D.name}</span><span class="dlv">${tr('단계')} ${i + 1}</span></div>
+      <dl class="kv"><dt>${tr('적 체력·속도')}</dt><dd>×${dmult(i).toFixed(2)}</dd><dt>${tr('제한 시간')}</dt><dd>${mmss(D.limit)} ${tr('±맵')}</dd><dt>${tr('클리어 보상')}</dt><dd>+${D.ap} AP</dd><dt>${tr('최고 기록')}</dt><dd>${r.best == null ? '—' : mmss(r.best)}</dd><dt>${tr('클리어 / 플레이')}</dt><dd>${r.clears} / ${r.plays}</dd></dl>
+      <button class="btn primary" type="button" data-diff="${i}">${tr('{n} 시작', { n: D.name })}</button>
     </div>`;
   }).join('');
   const g = $('garage'); g.innerHTML = '';
   for (const type of ORDER) {
     const d = TOWERS[type], own = isUnlocked(type);
     const c = document.createElement('div'); c.className = 'gcard' + (own ? '' : ' locked');
-    c.innerHTML = `<canvas width="96" height="96" aria-hidden="true"></canvas><div><div class="nm">${d.name} <span class="dlv">${d.cost} 금화</span></div><div class="ds">${d.desc}</div><div class="act">` +
-      (own ? '<span class="owned">보유</span>' + (type in prog.paint ? `<span class="swatches" role="group" aria-label="${d.name} 색">${PAINTS.map(c => `<button type="button" class="sw${prog.paint[type] === c.id ? ' on' : ''}" style="--sw:${c.hex}" data-paint="${type}" data-color="${c.id}" aria-label="${c.name}" aria-pressed="${prog.paint[type] === c.id}" title="${c.name}${prog.paint[type] === c.id ? ' · 다시 누르면 원래 색' : ''}">${c.name[0]}</button>`).join('')}</span>` : '') : `<button class="btn sm ${prog.ap >= d.ap ? 'primary' : ''}" type="button" data-unlock="${type}" ${prog.ap >= d.ap ? '' : 'disabled'}>🔒 ${d.ap} AP로 해제</button>`) + '</div></div>';
+    c.innerHTML = `<canvas width="96" height="96" aria-hidden="true"></canvas><div><div class="nm">${d.name} <span class="dlv">${d.cost} ${tr('금화')}</span></div><div class="ds">${d.desc}</div><div class="act">` +
+      (own ? '<span class="owned">' + tr('보유') + '</span>' + (type in prog.paint ? `<span class="swatches" role="group" aria-label="${d.name} ${tr('색')}">${PAINTS.map(c => `<button type="button" class="sw${prog.paint[type] === c.id ? ' on' : ''}" style="--sw:${c.hex}" data-paint="${type}" data-color="${c.id}" aria-label="${c.name}" aria-pressed="${prog.paint[type] === c.id}" title="${c.name}${prog.paint[type] === c.id ? tr(' · 다시 누르면 원래 색') : ''}">${c.name[0]}</button>`).join('')}</span>` : '') : `<button class="btn sm ${prog.ap >= d.ap ? 'primary' : ''}" type="button" data-unlock="${type}" ${prog.ap >= d.ap ? '' : 'disabled'}>🔒 ${tr('{c} AP로 해제', { c: d.ap })}</button>`) + '</div></div>';
     const cx = c.querySelector('canvas').getContext('2d'); cx.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(cx, type, 30, 32, 1, -.7);
     g.appendChild(c);
   }
@@ -1749,15 +2031,15 @@ const TIPS = [
   '수다 떨다 숨은 말을 꺼내면 퀴즈가 나와요. 게임 중에 맞히면 보상을 받아요.',
 ];
 function statusLine() {
-  if (inLobby) return `지금은 로비예요. 업적 포인트는 ${prog.ap} AP 있어요. 난이도를 골라 출동해 보세요!`;
+  if (inLobby) return tr('지금은 로비예요. 업적 포인트는 {a} AP 있어요. 난이도를 골라 출동해 보세요!', { a: prog.ap });
   const D = DIFFS[S.diff];
-  return `${D.name} · ${MAP.name} 맵, 웨이브 ${S.wave}/20, 금화 ${S.gold}, 성문 내구도 ${S.lives}, 시간 ${mmss(S.time)} / ${mmss(limitOf(D, MAP))}이에요.`;
+  return tr('{d} · {m} 맵, 웨이브 {w}/20, 금화 {g}, 성문 내구도 {l}, 시간 {t} / {lim}이에요.', { d: D.name, m: MAP.name, w: S.wave, g: S.gold, l: S.lives, t: mmss(S.time), lim: mmss(limitOf(D, MAP)) });
 }
 function nextWaveLine() {
-  if (inLobby) return '아직 게임 전이에요. 시작하면 알려 줄게요.';
+  if (inLobby) return tr('아직 게임 전이에요. 시작하면 알려 줄게요.');
   const w = Math.min(MAX_WAVE, S.wave + (S.waveActive ? 0 : 1)), c = {};
   for (const q of buildWave(w)) c[q.type] = (c[q.type] || 0) + 1;
-  return `웨이브 ${w}: ` + Object.entries(c).map(([k, n]) => `${ENEMIES[k].name} ${n}대`).join(', ') + (w % 10 === 0 ? ' — 보스 웨이브예요!' : '');
+  return tr('웨이브 {w}: ', { w }) + Object.entries(c).map(([k, n]) => tr('{name} {n}대', { name: ENEMIES[k].name, n })).join(', ') + (w % 10 === 0 ? tr(' — 보스 웨이브예요!') : '');
 }
 // ---------- conversation engine ----------
 // 규칙 기반 대화. 의도 파악 → 인물별 대사 → 앞 대화 맥락(상대가 던진 질문, 유저 이름)을 반영합니다.
@@ -1936,10 +2218,11 @@ const INTENTS = [
   ['disagree', /^(아니|ㄴㄴ|노|아냐|별로)[.!~]*$/],
   ['youQ', /^(너는|넌|당신은|자네는|너도)\??$/],
 ];
-const WEAPON_RE = /새총|느림보|소형대포|빽총|대형대포|빙결|강력새총/;
+let WEAPON_RE = /새총|느림보|소형대포|빽총|대형대포|빙결|강력새총/;
 const STOP = new Set(['나', '너', '저', '오늘', '어제', '내일', '요즘', '아까', '지금', '그냥', '진짜', '정말', '좀', '너무', '완전', '근데', '그래서', '그리고', '이거', '그거', '저거', '여기', '거기', '뭐', '왜', '어떻게', '언제', '어디', '친구랑']);
 const VERBISH = /(어|아|다|요|지|네|까|래|자|했|함|음|임|더라|던데|는데)$/;
-function keyword(text) {
+function keyword(text) { return IS_EN ? keywordEn(text) : keywordKo(text); }
+function keywordKo(text) {
   const toks = text.replace(/[?!.,~…ㅋㅎ]+/g, ' ').split(/\s+/).filter(Boolean);
   const cands = [];
   for (let w of toks) {
@@ -1949,14 +2232,14 @@ function keyword(text) {
   }
   return (cands[cands.length - 1] || '').slice(0, 10);
 }
-const cleanName = s => s.replace(/(이야|야|이에요|예요|입니다|이라고해|라고해|이고|임|이요|요)$/, '').replace(/[^가-힣a-zA-Z]/g, '').slice(0, 8);
+const cleanName = s => IS_EN ? cleanNameEn(s) : s.replace(/(이야|야|이에요|예요|입니다|이라고해|라고해|이고|임|이요|요)$/, '').replace(/[^가-힣a-zA-Z]/g, '').slice(0, 8);
 const hasBatchim = w => { const ch = w.charCodeAt(w.length - 1); return ch >= 0xAC00 && ch <= 0xD7A3 && (ch - 0xAC00) % 28 !== 0; };
 const JOSA = { 랑: ['이랑', '랑'], 는: ['은', '는'], 가: ['이', '가'], 를: ['을', '를'], 라니: ['이라니', '라니'], 라: ['이라', '라'], 잖아: ['이잖아', '잖아'] };
 const withJosa = (w, j) => w + (j ? JOSA[j][hasBatchim(w) ? 0 : 1] : '');
-const isQuestion = (raw, norm) => /\?$/.test(raw.trim()) || /(니|나요|까|냐|어때|뭐야|뭐해|왜|어떻게|언제|어디|누구|몇)$/.test(norm.replace(/[?!.~]+$/, ''));
+const isQuestion = (raw, norm) => /\?$/.test(raw.trim()) || (IS_EN ? /^(what|why|how|when|where|who|which|do|does|did|are|is|can|could|will|would|have)\b/.test(norm) : /(니|나요|까|냐|어때|뭐야|뭐해|왜|어떻게|언제|어디|누구|몇)$/.test(norm.replace(/[?!.~]+$/, '')));
 function fill(c, s, extra = {}) {
   const id = c.P.id, n = c.facts.name;
-  const val = { you: n ? YOU_NAMED[id](n) : YOU[id], n: n || '', x: extra.x || '그거' };
+  const val = { you: n ? YOU_NAMED[id](n) : YOU[id], n: n || '', x: extra.x || tr('그거') };
   return s.replace(/\{(you|n|x)(?::([가-힣]+))?\}/g, (_, k, j) => withJosa(val[k], j));
 }
 function fresh(c, arr) {
@@ -1990,7 +2273,7 @@ function compose(c, text, norm) {
     }
     if (lastAsk === 'feel' && (intent === 'feelGood' || intent === 'feelBad')) { /* 아래 감정 대사로 */ }
     else if (lastAsk !== 'name') {
-      const wk = ORDER.find(k => norm.includes(TOWERS[k].name.replace(/\s+/g, '')));
+      const wk = ORDER.find(k => mentions(norm, k));
       const x = (lastAsk === 'weapon' && wk ? TOWERS[wk].name : keyword(text)) || text.trim().slice(0, 10);
       c.facts[lastAsk] = x;
       out.push(fill(c, ACK[lastAsk][P.id], { x }));
@@ -2004,10 +2287,10 @@ function compose(c, text, norm) {
     case 'status': out.push(voice(P, statusLine())); break;
     case 'next': out.push(voice(P, nextWaveLine())); break;
     case 'tips': out.push(voice(P, pick(TIPS))); break;
-    case 'ap': out.push(voice(P, `업적 포인트는 지금 ${prog.ap} AP예요.`)); break;
-    case 'map': out.push(voice(P, inLobby ? '맵은 5종이고 판마다 무작위로 나와요.' : `이번 맵은 ${MAP.name}, 길이 ${Math.round(MAP.len / T)}칸이에요.`)); break;
-    case 'time': out.push(voice(P, `지금은 ${clock()}이에요.`)); break;
-    case 'weather': out.push(voice(P, pick(['오늘 협곡에 바람이 꽤 불어요 🍃', '성문 쪽은 해가 잘 들어서 따뜻해요', '비가 오면 웅덩이가 더 커지려나요?']))); break;
+    case 'ap': out.push(voice(P, tr('업적 포인트는 지금 {a} AP예요.', { a: prog.ap }))); break;
+    case 'map': out.push(voice(P, inLobby ? tr('맵은 5종이고 판마다 무작위로 나와요.') : tr('이번 맵은 {m}, 길이 {n}칸이에요.', { m: MAP.name, n: Math.round(MAP.len / T) }))); break;
+    case 'time': out.push(voice(P, tr('지금은 {c}이에요.', { c: clock() }))); break;
+    case 'weather': out.push(voice(P, pick([tr('오늘 협곡에 바람이 꽤 불어요 🍃'), tr('성문 쪽은 해가 잘 들어서 따뜻해요'), tr('비가 오면 웅덩이가 더 커지려나요?')]))); break;
     case 'whoami': out.push(P.me); if (Math.random() < .5) out.push(askBack(c)); break;
     case 'food': case 'hobby': case 'dream': case 'age': {
       const facts = { food: P.food, hobby: P.hobby, dream: P.dream, age: P.age };
@@ -2016,7 +2299,7 @@ function compose(c, text, norm) {
       break;
     }
     case 'weapon': {
-      const key = ORDER.find(k => norm.includes(TOWERS[k].name.replace(/\s+/g, '')));
+      const key = ORDER.find(k => mentions(norm, k));
       if (key) { c.facts.weapon = TOWERS[key].name; out.push(fill(c, ACK.weapon[P.id], { x: TOWERS[key].name })); out.push(voice(P, TOWERS[key].desc)); }
       break;
     }
@@ -2059,6 +2342,185 @@ const TRIGGERS = [
 ];
 const SUGGEST = ['안녕?', '넌 누구야?', '뭐 해?', '배고파', '심심해', '몇 살이야?', '꿈이 뭐야?', '지금 상황 어때?', '팁 좀 줘', '다음 웨이브는?', '좋아하는 색깔은?', '피자 좋아해?', '커피 마실래?', '여행 가고 싶다', '강아지 좋아해?', '노래 추천해 줘', '바다 보고 싶다', '친구 있어?', '무섭지 않아?', '언제 퇴근해?', '오늘 내 생일이야', '우산 챙겼어?', '힘 세?', '고마워', '최고야!', '피곤하다'];
 const rollTrigger = () => pick(TRIGGERS);
+// ===== English chat engine data: Haru (she, bright chatty friend) and Doyun (he, calm tactical adviser) =====
+const EN_STOP = new Set(['i', 'you', 'me', 'my', 'we', 'it', 'the', 'a', 'an', 'is', 'are', 'am', 'was', 'were', 'be', 'to', 'of', 'and', 'or', 'but', 'so', 'that', 'this', 'what', 'who', 'how', 'why', 'when', 'where', 'do', 'does', 'did', 'just', 'really', 'very', 'too', 'like', 'got', 'get', 'have', 'has', 'had', 'not', 'yes', 'in', 'on', 'at', 'for', 'with', 'about', 'your', 'its', 'thats', 'dont', 'cant', 'can', 'will', 'would', 'could', 'should', 'today', 'tonight', 'now', 'then', 'there', 'here', 'some', 'any', 'more', 'much', 'lot', 'think', 'know', 'want', 'need', 'say', 'said', 'hey', 'hello', 'please', 'tell', 'okay']);
+function keywordEn(text) {
+  const toks = text.toLowerCase().replace(/[^a-z' ]/g, ' ').split(/\s+/).filter(Boolean).map(w => w.replace(/'s$/, ''));
+  const c = toks.filter(w => w.length >= 3 && !EN_STOP.has(w));
+  return (c[c.length - 1] || '').slice(0, 14);
+}
+const cleanNameEn = s => { const w = (s.replace(/[^a-zA-Z' -]/g, ' ').trim().split(/\s+/)[0] || ''); return w ? w[0].toUpperCase() + w.slice(1, 12).toLowerCase() : ''; };
+const normOf = text => IS_EN ? text.toLowerCase().replace(/[^a-z0-9'?!.,\s]/g, ' ').replace(/\s+/g, ' ').trim() : text.toLowerCase().replace(/\s+/g, '');
+const mentions = (norm, k) => norm.replace(/\s+/g, '').includes(TOWERS[k].name.toLowerCase().replace(/\s+/g, ''));
+
+if (IS_EN) {
+  PERSONAS.length = 0;
+  PERSONAS.push(
+    { id: 'haru', name: 'Haru', tag: 'Bright, chatty friend', color: '#f5c542', pre: '', suf: '',
+      hi: ['Hi! I\'m Haru 😆', 'Talk to me any time you\'re bored. I\'ll keep listening while you play!'],
+      me: 'I\'m Haru! Chatting is my favorite thing in the whole world haha', food: 'Spicy rice cakes! I love sweating from the heat 🌶️', hobby: 'Singing my heart out at karaoke 🎤',
+      dream: 'To travel the world and make a hundred friends', age: 'Old enough to be your friend, young enough to stay up all night 😜' },
+    { id: 'doyun', name: 'Doyun', tag: 'Calm tactical adviser', color: '#86d0ee', pre: '', suf: '',
+      hi: ['Tactical adviser Doyun here. 📡', 'Ask me about the battlefield any time. I answer even during combat.'],
+      me: 'I\'m Doyun, the tactical adviser who reads the battlefield with you. Ask if you need tips', food: 'A bowl of hot soup is plenty for me', hobby: 'Studying maps and calculating chokepoints',
+      dream: 'A perfect defense where nobody gets hurt', age: 'Old enough to have read a lot of battle reports. The exact number is classified.' });
+
+  TIPS.length = 0;
+  TIPS.push(
+    'Put the Snail Gun in front of your strongest weapons and your damage jumps.',
+    'Spring Guns at path corners can send enemies back again and again. Tough enemies get pushed less.',
+    'Obstacles sit on the best spots for weapons. You can clear one for 5 AP.',
+    'You only earn AP if you clear within the time limit. Don\'t wait between waves.',
+    'The Freeze Gun stops enemies for a moment. It pairs well with area-damage cannons.',
+    'Attack power and attack speed in the passive shop apply to every weapon.',
+    'Keep chatting and say a hidden word to get a quiz. Answer it during a game for a reward.');
+
+  Object.assign(YOU, { haru: 'you', doyun: 'Commander' });
+  Object.assign(YOU_NAMED, { haru: n => n, doyun: n => `Commander ${n}` });
+
+  const bankEn = {
+    greet: { haru: ['Hi! So glad you came 😆 How was your day?', 'Heyyy! I was waiting for you!', 'There you are! What should we talk about today?'],
+             doyun: ['Good day, {you}. The canyon is quiet today.', 'Welcome, {you}. Say whatever is on your mind.'] },
+    bye: { haru: ['Leaving already? Come back soon! 👋', 'Okay, bye~ let\'s chat again tomorrow!'], doyun: ['Understood. Call me any time.', 'Good work, {you}.'] },
+    howru: { haru: ['I\'m great! Even better now that I\'m talking to {you} haha', 'Honestly I was a bit sleepy, but then you showed up and woke me up!'],
+             doyun: ['I\'m calm as usual. How about you?', 'Not bad. It would be better if the battle went well.'] },
+    feelGood: { haru: ['Ooh, something good happened? I\'m excited too 🎉', 'Hehe, when you\'re happy, I\'m happy!'], doyun: ['Good news. Let\'s carry that momentum into the defense.', 'Glad to hear it. A good mood makes for good decisions.'] },
+    feelBad: { haru: ['Oh no, what happened? Tell me, I\'ll listen to everything', 'Sounds like a rough day… *pat pat* 🫂'], doyun: ['Hard days happen. It\'s fine to take a short break.', 'Don\'t push yourself. The battle will wait.'] },
+    thanks: { haru: ['Aw, no need~ we\'re friends haha', 'Thank you too!'], doyun: ['Not at all. It\'s my duty.', 'You\'re welcome, {you}.'] },
+    praise: { haru: ['Hehe, really? I\'m blushing 😳', 'Hearing that makes me feel like I could fly!'], doyun: ['You flatter me. But… thank you.', 'Praise raises morale. Thank you.'] },
+    insult: { haru: ['Aww… that hurts 🥺', 'Oh, did I do something wrong? Tell me and I\'ll fix it!'], doyun: ['… Understood. I\'ll work on my weak points.', 'Thank you for the feedback. I\'ll do better.'] },
+    love: { haru: ['Aww… I like {you} too 💛', 'So suddenly?! My heart skipped a beat haha'], doyun: ['…I\'m on duty, but that pleases me.', 'Those words give me strength.'] },
+    skill: { haru: ['Me? I\'m decent at games~ but not as good as {you} haha', 'My skill is a secret! You\'ll find out if we play together!'], doyun: ['Tactical analysis I\'m confident in. The real fight is up to {you}.', 'Drawing up plans is my specialty.'] },
+    gameOpinion: { haru: ['I think it\'ll do great! I\'d recommend it to all my friends haha', 'A defense game where you chat with a partner? That\'s rare!'],
+                   doyun: ['Coolly assessed, the maps and difficulty curve are solid. Tune the balance and it has a chance.', 'The next step is gathering tester feedback and balancing.'] },
+    joke: { haru: ['Why did the cookie go to the doctor? Because it felt crumby! hahaha', 'What do you call a fake noodle? An impasta! haha'], doyun: ['…A joke nobody laughed at in the war room. Why don\'t skeletons fight? They have no guts. …Apologies.', 'Jokes aren\'t my specialty, but: why did the scarecrow win an award? He was outstanding in his field.'] },
+    laugh: { haru: ['hahaha what, why are you laughing, now I\'m laughing too', 'When you laugh, I feel good haha'], doyun: ['Laughter is a good sign.', '…I caught myself smiling.'] },
+    bored: { haru: ['Then chat with me! What\'s fun lately?', 'When you\'re bored, play a round! Or talk to me haha'], doyun: ['Then try a harder difficulty?', 'Clearing obstacles and building a new strategy is another way.'] },
+    agree: { haru: ['Right, right!', 'See, we really get each other haha'], doyun: ['Understood.', 'Very good, {you}.'] },
+    disagree: { haru: ['Oh, no? Then what, what?', 'Whoops, maybe I got it wrong haha'], doyun: ['Understood. I\'ll correct that.', 'I see. I\'ll think about it differently.'] },
+    unknownQ: { haru: ['Hmm… I\'m not sure about that! What do you think?', 'Ooh, tough question haha let\'s think about it together!'], doyun: ['I can\'t give you an exact answer. What is your view, {you}?', 'I lack information on that. Could you tell me a bit more?'] },
+    echoNoun: { haru: ['{x}? That came out of nowhere haha, do you like it?', '{x}! I know that one haha what happened?'], doyun: ['You mean {x}? May I ask what you mean?', '{x}… what is it connected to?'] },
+    echo: { haru: ['Oh, {x}? Tell me more about that!', 'Ooh, {x}! Then what happened?', 'You\'re talking about {x}! I love hearing stories like that'], doyun: ['You mentioned {x}. Could you explain a little more?', 'Interesting. {x}, noted.'] },
+    nameLearn: { haru: ['{n}! What a lovely name. I\'ll call you that from now on haha'], doyun: ['Commander {n}, I\'ll remember it.'] },
+    nameRecall: { haru: ['Of course I remember! You\'re {n} haha'], doyun: ['You are Commander {n}.'] },
+    nameUnknown: { haru: ['You haven\'t told me your name yet! Come on, tell me haha'], doyun: ['I haven\'t heard your name yet. Would you tell me?'] },
+  };
+  for (const k in bankEn) B[k] = bankEn[k];
+  for (const k in B) if (!bankEn[k]) delete B[k];
+
+  const askEn = {
+    food: { haru: 'By the way, what\'s your favorite food?', doyun: 'What food do you like, Commander?' },
+    fun: { haru: 'What\'s the most fun thing for you lately?', doyun: 'Is there something you enjoy these days?' },
+    weapon: { haru: 'Which weapon is your favorite?', doyun: 'Which weapon do you trust the most?' },
+    feel: { haru: 'How are you feeling today?', doyun: 'How is your condition today?' },
+    name: { haru: 'Oh right, what\'s your name?', doyun: 'Pardon me, may I ask your name?' },
+  };
+  for (const k in askEn) ASK[k] = askEn[k];
+  const ackEn = {
+    food: { haru: '{x}! Sounds delicious 😋 I want some too', doyun: '{x}, a good choice. I\'ll remember it.' },
+    fun: { haru: 'Ooh, {x}! I want to try that too', doyun: '{x}, that\'s a good way to unwind.' },
+    weapon: { haru: '{x}, nice! I like that one too', doyun: '{x} is a good choice. Placement is the key.' },
+    feel: { haru: 'I see! Thanks for telling me haha', doyun: 'Thank you for telling me.' },
+  };
+  for (const k in ackEn) ACK[k] = ackEn[k];
+
+  INTENTS.length = 0;
+  INTENTS.push(
+    ['nameAsk', /\b(what('?s| is) my name|do you (remember|know) my name)\b/],
+    ['nameTell', /\b(?:my name is|call me|my name's|name's)\s+([a-z]{2,12})/],
+    ['bye', /\b(bye|goodbye|see you|see ya|gotta go|got to go|good night|later)\b/],
+    ['greet', /^(hi|hello|hey|yo|howdy|sup|good (morning|afternoon|evening))\b/],
+    ['status', /\b(status|situation|how('?s| is) (the )?(battle|game|fight|gate)|what wave|which wave|how much gold|time left|gate hp)\b/],
+    ['next', /\b(next wave|what'?s coming|what comes next|what do i face)\b/],
+    ['tips', /\b(tip|tips|advice|hint|strategy|how do i (win|beat)|i'?m stuck|what should i)\b|^help\b/],
+    ['ap', /\b(ap|achievement points?)\b/],
+    ['map', /\b(map|maps)\b/],
+    ['gameOpinion', /\bgame\b.*\b(good|fun|popular|sell|succeed|hit|bad|rate)\b|\bwill (it|this) (sell|succeed)\b/],
+    ['skill', /\b(good at (this|games)|are you good|your skill|pro player)\b/],
+    ['joke', /\b(joke|funny story|make me laugh|something funny)\b/],
+    ['love', /\b(i love you|love you|i like you|like you a lot)\b/],
+    ['praise', /\b(cute|pretty|beautiful|handsome|cool|awesome|amazing|great|smart|genius|well done|good job|nice)\b/],
+    ['insult', /\b(stupid|dumb|idiot|hate you|ugly|annoying|you suck|useless|boring game)\b/],
+    ['thanks', /\b(thanks|thank you|thx|ty|appreciate)\b/],
+    ['howru', /\b(how are you|how'?s it going|how do you feel|you okay|how have you been|what'?s up)\b/],
+    ['feelBad', /\b(sad|depressed|tired|exhausted|lonely|upset|angry|stressed|sick|bad day|terrible|sleepy|hurt)\b/],
+    ['feelGood', /\b(happy|excited|glad|great day|good day|wonderful|i won|i cleared|i did it|feeling good|feeling great)\b/],
+    ['bored', /\b(bored|nothing to do)\b/],
+    ['whoami', /\b(who are you|what are you|introduce yourself|tell me about yourself)\b/],
+    ['food', /\b(hungry|food|eat|eating|snack|lunch|dinner|breakfast|delicious)\b/],
+    ['hobby', /\b(hobby|hobbies|what do you like|favorite thing|for fun)\b/],
+    ['dream', /\b(dream|dreams|ambition|want to be)\b/],
+    ['age', /\b(how old|your age)\b/],
+    ['time', /\b(what time|time is it|current time)\b/],
+    ['weather', /\b(weather|rain|raining|sunny|hot|cold|snow)\b/],
+    ['laugh', /^(ha+h?a*|he+h+e*|lol|lmao|rofl|hihi|xd)\W*$/],
+    ['agree', /^(yes|yeah|yep|yup|sure|ok|okay|right|of course|exactly|definitely|uh huh)\W*$/],
+    ['disagree', /^(no|nope|nah|not really|never)\W*$/],
+    ['youQ', /^(and you|you|how about you|what about you)\??$/]);
+  WEAPON_RE = /slingshot|snail gun|small cannon|spring gun|heavy cannon|freeze gun/;
+
+  TRIGGERS.length = 0;
+  TRIGGERS.push(
+    { label: 'pizza', re: /\bpizza\b/, hint: 'Weirdly, I\'m craving something round with stretchy cheese… 🍕' },
+    { label: 'music', re: /\b(song|songs|music|singing|sing)\b/, hint: 'I can\'t get a tune out of my head… 🎵' },
+    { label: 'umbrella', re: /\b(umbrella|raincoat|raining|rain)\b/, hint: 'The sky looks gloomy. Should I bring something? ☔' },
+    { label: 'dog', re: /\b(dog|dogs|puppy|puppies)\b/, hint: 'I really love animals that wag their tails 🐾' },
+    { label: 'travel', re: /\b(travel|trip|vacation|holiday)\b/, hint: 'After the battle I want to go somewhere far away… ✈️' },
+    { label: 'birthday', re: /\b(birthday|cake)\b/, hint: 'Anything about candles on a cake gets me excited 🎂' },
+    { label: 'ocean', re: /\b(sea|ocean|beach)\b/, hint: 'I miss the sound of the ocean… 🌊' },
+    { label: 'coffee', re: /\b(coffee|latte|espresso|americano)\b/, hint: 'When I\'m sleepy, nothing beats that bitter cup ☕' },
+    { label: 'what are you doing?', re: /\b(what are you doing|what'?re you doing|whatcha doing)\b/, hint: 'Doesn\'t anyone wonder what I\'m up to? 👀' },
+    { label: 'favorite color?', re: /\b(favorite colou?r|what colou?r)\b/, hint: 'I have a lot to say about colors… 🎨' },
+    { label: 'are you strong?', re: /\b(are you strong|how strong)\b/, hint: 'I wish someone would ask how strong I am 💪' },
+    { label: 'off work?', re: /\b(get off work|off work|finish work|clock out)\b/, hint: 'Where is the person who asks when I clock out… 🕕' },
+    { label: 'scared?', re: /\b(scared|afraid|fear|frightened)\b/, hint: 'Honestly… those black cars are a bit scary. Ask me and I\'ll tell you.' },
+    { label: 'friends?', re: /\b(friend|friends)\b/, hint: 'I\'d love to get to know the other cars here… 🚗🚙' });
+  SUGGEST.length = 0;
+  SUGGEST.push('Hi!', 'Who are you?', 'What are you doing?', 'I\'m hungry', 'I\'m bored', 'How old are you?', 'What is your dream?', 'How\'s the battle going?', 'Give me a tip', 'What\'s the next wave?', 'Favorite color?', 'Do you like pizza?', 'Want some coffee?', 'I want to travel', 'Do you like dogs?', 'Any song to recommend?', 'I miss the ocean', 'Do you have friends?', 'Are you scared?', 'When do you get off work?', 'It\'s my birthday', 'Thanks!', 'You\'re awesome!', 'I\'m tired');
+  QUIZ.length = 0;
+  QUIZ.push(
+    ['What is the largest planet in our solar system?', 'Jupiter', ['Saturn', 'Earth', 'Neptune']],
+    ['What is the chemical formula for water?', 'H₂O', ['CO₂', 'O₂', 'NaCl']],
+    ['Who painted the Mona Lisa?', 'Leonardo da Vinci', ['Michelangelo', 'Raphael', 'Picasso']],
+    ['Which is the largest ocean on Earth?', 'Pacific', ['Atlantic', 'Indian', 'Arctic']],
+    ['What is the tallest mountain above sea level?', 'Mount Everest', ['K2', 'Kilimanjaro', 'Mont Blanc']],
+    ['How many legs does a spider have?', '8', ['6', '10', '12']],
+    ['How many players does one soccer team have on the field?', '11', ['9', '10', '12']],
+    ['At sea level, water boils at how many degrees Celsius?', '100', ['80', '90', '120']],
+    ['Which planet is closest to the Sun?', 'Mercury', ['Venus', 'Mars', 'Earth']],
+    ['How many rings are on the Olympic flag?', '5', ['4', '6', '7']],
+    ['How many keys does a standard piano have?', '88', ['76', '61', '100']],
+    ['Who wrote Romeo and Juliet?', 'William Shakespeare', ['Goethe', 'Tolstoy', 'Hemingway']],
+    ['Which flightless bird lives in Antarctica?', 'Penguin', ['Albatross', 'Seagull', 'Eagle']],
+    ['Which is the largest country by area?', 'Russia', ['Canada', 'China', 'United States']],
+    ['How many seconds are in one hour?', '3600', ['360', '600', '6000']],
+    ['What do giant pandas mainly eat?', 'Bamboo', ['Fish', 'Honey', 'Acorns']],
+    ['What is the capital of Japan?', 'Tokyo', ['Osaka', 'Kyoto', 'Sapporo']],
+    ['Which famous iron tower stands in Paris?', 'Eiffel Tower', ['Big Ben', 'Leaning Tower of Pisa', 'CN Tower']],
+    ['What is a baby frog called?', 'Tadpole', ['Caterpillar', 'Larva', 'Cub']],
+    ['How many meters are in a kilometer?', '1000', ['100', '10000', '500']],
+    ['What do plants use light for when making food?', 'Photosynthesis', ['Respiration', 'Transpiration', 'Fermentation']],
+    ['How many bones does an adult human body have?', '206', ['106', '306', '406']],
+    ['Which gas makes soda fizzy?', 'Carbon dioxide', ['Oxygen', 'Nitrogen', 'Hydrogen']],
+    ['What do the angles of a triangle add up to?', '180 degrees', ['90 degrees', '270 degrees', '360 degrees']],
+    ['Which of these is NOT a mammal?', 'Shark', ['Whale', 'Bat', 'Dolphin']],
+    ['Who made the first powered airplane flight?', 'The Wright brothers', ['The Grimm brothers', 'The Lumière brothers', 'The Warner brothers']],
+    ['What is 7 × 8?', '56', ['54', '63', '48']],
+    ['How many stars make up the Big Dipper, as commonly counted?', '7', ['5', '6', '9']],
+    ['Which part is the "brain" of a computer?', 'CPU', ['Monitor', 'Keyboard', 'Mouse']],
+    ['Sound travels fastest through which of these?', 'Steel', ['Water', 'Air', 'A vacuum']],
+    ['What is the Earth\'s only natural satellite?', 'The Moon', ['The Sun', 'Mars', 'Venus']],
+    ['Which traffic light color means "stop"?', 'Red', ['Green', 'Yellow', 'Blue']],
+    ['What is the currency of Japan?', 'Yen', ['Won', 'Yuan', 'Dollar']],
+    ['Which animal is the largest on Earth?', 'Blue whale', ['African elephant', 'Giraffe', 'Great white shark']],
+    ['How many continents are there?', '7', ['5', '6', '8']],
+    ['Who wrote the Harry Potter books?', 'J. K. Rowling', ['Roald Dahl', 'J. R. R. Tolkien', 'C. S. Lewis']],
+    ['Which planet is the hottest?', 'Venus', ['Mercury', 'Mars', 'Jupiter']],
+    ['Which gas do humans need to breathe?', 'Oxygen', ['Helium', 'Nitrogen', 'Carbon dioxide']],
+    ['How many days are there in a leap year?', '366', ['365', '364', '367']],
+    ['How many colors of the rainbow are commonly counted?', '7', ['5', '6', '8']]);
+}
+
 // ---------- affection ----------
 // 호감도는 대화 상대마다 따로 쌓입니다. 메시지 하나에 대략 0.4~2점이 오르도록 설계했습니다.
 //  기본 0.4 + 글자 수 보너스(최대 0.6) + 알아듣는 주제 0.5 + 상대에게 관심 보이기(이름·음식·취미·꿈·나이) 0.3
@@ -2076,7 +2538,7 @@ function msgAff(c, text, norm, intent) {
   let g = .4 + Math.min(.6, text.length / 50);
   if (intent) g += .5;
   if (['whoami', 'food', 'hobby', 'dream', 'age', 'answer', 'nameTell', 'howru'].includes(intent)) g += .3;
-  if (/고마|감사|최고|멋져|짱|좋아해|사랑|귀여|예쁘|잘했|잘한다|대단/.test(norm)) g += .8;
+  if ((IS_EN ? /thank|awesome|amazing|love|cute|great job|well done|smart|genius|you'?re (the )?best/ : /고마|감사|최고|멋져|짱|좋아해|사랑|귀여|예쁘|잘했|잘한다|대단/).test(norm)) g += .8;
   c.recent = c.recent || [];
   if (c.recent.includes(norm)) g = 0;
   if (now - (c.lastAt || 0) < 4000) g *= .3;
@@ -2166,7 +2628,7 @@ function personaCanvas(id, size) {
 }
 
 const chatEl = $('chat'), chatBody = $('chatBody'), chatReplies = $('chatReplies'), chatInput = $('chatInput'), chatSuggest = $('chatSuggest');
-const clock = () => new Date().toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+const clock = () => new Date().toLocaleTimeString(IS_EN ? 'en-US' : 'ko-KR', { hour: 'numeric', minute: '2-digit' });
 const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const scrollDown = () => { chatBody.scrollTop = chatBody.scrollHeight; };
@@ -2214,14 +2676,14 @@ function setHeader() {
   const P = curP(), head = $('chatAvatar').getContext('2d');
   head.setTransform(1, 0, 0, 1, 0, 0); head.clearRect(0, 0, 76, 76);
   if (P && !picking) { head.setTransform(76 / 60, 0, 0, 76 / 60, 0, 0); drawPersona(head, P.id); }
-  $('chatName').textContent = picking || !P ? '대화 상대 고르기' : P.name;
-  $('chatSub').textContent = picking || !P ? '함께 수다 떨 사람을 골라 주세요' : P.tag;
+  $('chatName').textContent = picking || !P ? tr('대화 상대 고르기') : P.name;
+  $('chatSub').textContent = picking || !P ? tr('함께 수다 떨 사람을 골라 주세요') : P.tag;
   $('chatSwap').hidden = picking || !P;
   updateAffUI();
   chatEl.style.setProperty('--tc', P && !picking ? P.color : '#e2b54a');
 }
 function renderPicker() {
-  chatBody.innerHTML = '<div class="chat-day">대화 상대</div>';
+  chatBody.innerHTML = '<div class="chat-day">' + (IS_EN ? 'Chat partners' : '대화 상대') + '</div>';
   const grid = document.createElement('div'); grid.className = 'ppick';
   for (const P of PERSONAS) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'pcard' + (prog.persona === P.id ? ' on' : ''); b.style.setProperty('--pc', P.color);
@@ -2231,7 +2693,7 @@ function renderPicker() {
     grid.appendChild(b);
   }
   chatBody.appendChild(grid);
-  chatReplies.innerHTML = ''; chatSuggest.innerHTML = ''; chatInput.disabled = true; $('chatSend').disabled = true; chatInput.placeholder = '먼저 대화 상대를 골라 주세요';
+  chatReplies.innerHTML = ''; chatSuggest.innerHTML = ''; chatInput.disabled = true; $('chatSend').disabled = true; chatInput.placeholder = tr('먼저 대화 상대를 골라 주세요');
 }
 function choosePersona(id) {
   prog.persona = id; saveProg(); picking = false; itemsKey = '';
@@ -2245,7 +2707,7 @@ function renderChat() {
   const P = curP();
   if (picking || !P) { renderPicker(); return; }
   const c = convo(P); c.unread = 0;
-  chatBody.innerHTML = `<div class="chat-day">${new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>`;
+  chatBody.innerHTML = `<div class="chat-day">${new Date().toLocaleDateString(IS_EN ? 'en-US' : 'ko-KR', { month: 'long', day: 'numeric' })}</div>`;
   c.log.forEach((m, i) => chatBody.appendChild(msgEl(c, m, c.log[i - 1])));
   scrollDown(); refreshComposer();
 }
@@ -2258,7 +2720,7 @@ function openChat() {
 function closeChat() { chatOpen = false; picking = false; chatEl.hidden = true; $('chatFab').hidden = false; }
 function updateFab() {
   const P = curP(), c = P && chats[P.id], n = c ? c.unread : 0;
-  const label = P ? P.name : '대화 상대';
+  const label = P ? P.name : tr('대화 상대');
   const lab2 = P ? `${label} 💗${Math.floor(affOf(P))}` : label;
   if ($('fabName').textContent !== lab2) $('fabName').textContent = lab2;
   $('fabBadge').hidden = !n; if (n) $('fabBadge').textContent = Math.min(9, n);
@@ -2274,9 +2736,9 @@ function refreshComposer() {
     const items = p.kind === 'quiz'
       ? p.q.options.map(o => ({ label: o }))
       : [
-        { key: 'gold', icon: '💰', label: `금화 +${p.gold}`, sub: '바로 받아서 무기를 더 세워요' },
-        { key: 'slow', icon: '🐢', label: '적 속도 20% 감소', sub: '전투 중 30초 동안 모든 적이 느려져요' },
-        { key: 'buff', icon: '💥', label: '모든 무기 공격력 +10%', sub: '이번 판이 끝날 때까지 적용돼요' },
+        { key: 'gold', icon: '💰', label: tr('금화 +{n}', { n: p.gold }), sub: tr('바로 받아서 무기를 더 세워요') },
+        { key: 'slow', icon: '🐢', label: tr('적 속도 20% 감소'), sub: tr('전투 중 30초 동안 모든 적이 느려져요') },
+        { key: 'buff', icon: '💥', label: tr('모든 무기 공격력 +10%'), sub: tr('이번 판이 끝날 때까지 적용돼요') },
       ];
     items.forEach((it, i) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
@@ -2287,7 +2749,7 @@ function refreshComposer() {
   }
   const locked = !!p;
   chatInput.disabled = locked; $('chatSend').disabled = locked;
-  chatInput.placeholder = locked ? (p.kind === 'quiz' ? '보기 중에서 정답을 골라 주세요' : '선물을 하나 골라 주세요') : `${P.name}에게 말하기`;
+  chatInput.placeholder = locked ? (p.kind === 'quiz' ? tr('보기 중에서 정답을 골라 주세요') : tr('선물을 하나 골라 주세요')) : tr('{n}에게 말하기', { n: P.name });
   chatSuggest.innerHTML = '';
   if (!locked) {
     for (const s of SUGGEST.slice().sort(() => Math.random() - .5).slice(0, 3)) {
@@ -2307,25 +2769,25 @@ async function send(text) {
   chatInput.value = '';
   logMe(c, esc(text));
   c.busy = true; refreshComposer();
-  const norm = text.toLowerCase().replace(/\s+/g, '');
+  const norm = normOf(text);
   if (c.trigger && c.trigger.re.test(norm)) {
     c.misses = 0;
     if (inLobby || S.over) {
-      await say(c, voice(P, `오, "${esc(text)}"! 그 말 기다리고 있었어요. 게임 시작하면 그때 퀴즈 낼게요 🎁`));
+      await say(c, voice(P, tr('오, "{x}"! 그 말 기다리고 있었어요. 게임 시작하면 그때 퀴즈 낼게요 🎁', { x: esc(text) })));
     } else {
-      await say(c, voice(P, `어? 방금 "${esc(text)}"라고 했죠! 그 말 기다리고 있었어요 😆`));
-      await say(c, voice(P, '퀴즈 하나 낼게요. 맞히면 선물 줄게요 🎁'), 'gift');
+      await say(c, voice(P, tr('어? 방금 "{x}"라고 했죠! 그 말 기다리고 있었어요 😆', { x: esc(text) })));
+      await say(c, voice(P, tr('퀴즈 하나 낼게요. 맞히면 선물 줄게요 🎁')), 'gift');
       const q = drawQuiz(); c.trigger = null;
       await say(c, `<span class="q">Q. ${q.q}</span>`);
       c.pending = { kind: 'quiz', q, game: S };
     }
-  } else if (/퀴즈|문제/.test(norm)) {
-    await say(c, voice(P, c.cool ? '퀴즈는 다음 웨이브 막고 나서 또 낼게요!' : '퀴즈요? 그냥은 안 내요 😏 수다 떨다 보면 갑자기 생각날지도?'));
+  } else if ((IS_EN ? /\bquiz(zes)?\b/ : /퀴즈|문제/).test(norm)) {
+    await say(c, voice(P, c.cool ? tr('퀴즈는 다음 웨이브 막고 나서 또 낼게요!') : tr('퀴즈요? 그냥은 안 내요 😏 수다 떨다 보면 갑자기 생각날지도?')));
   } else {
     const { lines, intent } = compose(c, text, norm);
     const ms = gainAff(c, msgAff(c, text, norm, intent));
     for (const l of lines) await say(c, l);
-    if (ms) await say(c, voice(P, `우리 호감도가 ${ms}이 됐어요! 💗 ${ms >= ITEM_COST ? '호감도 상점에서 선물을 고를 수 있어요.' : '더 친해지면 선물을 줄게요.'}`), 'gift');
+    if (ms) await say(c, voice(P, tr('우리 호감도가 {ms}이 됐어요! 💗 {rest}', { ms, rest: ms >= ITEM_COST ? tr('호감도 상점에서 선물을 고를 수 있어요.') : tr('더 친해지면 선물을 줄게요.') })), 'gift');
     if (c.trigger && ++c.misses >= 6) { c.misses = 0; await say(c, voice(P, c.trigger.hint)); }
   }
   c.busy = false;
@@ -2340,13 +2802,13 @@ async function onChip(c, it) {
     logMe(c, esc(it.label)); refreshComposer();
     gainAff(c, it.label === p.q.a ? 3 : .5);
     if (it.label === p.q.a && live) {
-      await say(c, voice(c.P, '정답! 👏 선물 하나 골라 보세요.'), 'gift');
+      await say(c, voice(c.P, tr('정답! 👏 선물 하나 골라 보세요.')), 'gift');
       c.pending = { kind: 'reward', gold: 40 + S.wave * 5, game: S };
     } else if (it.label === p.q.a) {
-      await say(c, voice(c.P, '정답! 그런데 그 판은 이미 끝났네요. 다음엔 꼭 선물 줄게요.'));
+      await say(c, voice(c.P, tr('정답! 그런데 그 판은 이미 끝났네요. 다음엔 꼭 선물 줄게요.')));
       await cooldown(c);
     } else {
-      await say(c, voice(c.P, `땡! 정답은 <b>${esc(p.q.a)}</b>였어요 😅`));
+      await say(c, voice(c.P, tr('땡! 정답은 <b>{a}</b>였어요 😅', { a: esc(p.q.a) })));
       await cooldown(c);
     }
   } else {
@@ -2356,8 +2818,8 @@ async function onChip(c, it) {
       if (it.key === 'slow') S.slowAll = Math.max(S.slowAll, 0) + 30;
       if (it.key === 'buff') S.quizBuff = (S.quizBuff || 1) + .1;
       panelKey = '';
-      await say(c, voice(c.P, { gold: `금화 ${p.gold}개 보냈어요 💸`, slow: '적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.', buff: '무기들한테 힘 좀 실어 줬어요! 이번 판 동안 더 세게 쏠 거예요 💪' }[it.key]));
-    } else await say(c, voice(c.P, '아쉽게도 그 판은 끝났어요. 다음 판에 또 도전해요!'));
+      await say(c, voice(c.P, { gold: tr('금화 {n}개 보냈어요 💸', { n: p.gold }), slow: tr('적들 타이어 바람 좀 빼 놨어요 ㅋㅋ 30초 동안 느려질 거예요.'), buff: tr('무기들한테 힘 좀 실어 줬어요! 이번 판 동안 더 세게 쏠 거예요 💪') }[it.key]));
+    } else await say(c, voice(c.P, tr('아쉽게도 그 판은 끝났어요. 다음 판에 또 도전해요!')));
     await cooldown(c);
   }
   c.busy = false;
@@ -2365,12 +2827,12 @@ async function onChip(c, it) {
 }
 async function cooldown(c) {
   c.cool = true; c.trigger = null;
-  await say(c, voice(c.P, '다음 웨이브 막고 나면 또 퀴즈 낼 수 있어요. 그때까지 수다 떨어요 ㅎㅎ'));
+  await say(c, voice(c.P, tr('다음 웨이브 막고 나면 또 퀴즈 낼 수 있어요. 그때까지 수다 떨어요 ㅎㅎ')));
 }
 function onWaveCleared() {
   for (const c of Object.values(chats)) if (c.cool) {
     c.cool = false; c.trigger = rollTrigger(); c.misses = 0;
-    logThem(c, voice(c.P, `웨이브 ${S.wave} 막았다! 🎉 수다 떨다 보면 또 퀴즈가 생각날지도?`));
+    logThem(c, voice(c.P, tr('웨이브 {w} 막았다! 🎉 수다 떨다 보면 또 퀴즈가 생각날지도?', { w: S.wave })));
   }
 }
 function onNewGame() {
@@ -2398,7 +2860,7 @@ function useItem(k) {
     const P = curP(); if (!P || affOf(P) < ITEM_COST) return;
     prog.aff[P.id] = Math.round((affOf(P) - ITEM_COST) * 10) / 10; saveProg(); updateAffUI();
     S.planes.push({ d: 0, cd: 0, x: PTS[0].x, y: PTS[0].y, ang: 0 });
-    floatText(80, PTS[0].y - 24, '✈️ 출격! -💗' + ITEM_COST, '#7fb2e5');
+    floatText(80, PTS[0].y - 24, tr('✈️ 출격! -💗{c}', { c: ITEM_COST }), '#7fb2e5');
     panelKey = ''; return;
   }
   if (ITEMS[k].consumable) {
@@ -2410,7 +2872,7 @@ function useItem(k) {
   if (k === 'secret1') {
     S.itemUsed[k] = true;
     S.planes.push({ d: 0, cd: 0, x: PTS[0].x, y: PTS[0].y, ang: 0 });
-    floatText(60, PTS[0].y - 24, '✈️ 비행기 출격!', '#7fb2e5');
+    floatText(60, PTS[0].y - 24, tr('✈️ 비행기 출격!'), '#7fb2e5');
   } else { itemPlace = itemPlace === k ? null : k; build = null; sel = null; lockView = null; obsView = null; }
   panelKey = '';
 }
@@ -2430,7 +2892,7 @@ function buyItem(k) {
   if (!P) { openChat(); return; }
   if (prog.items[k] || affOf(P) < ITEM_COST) return;
   prog.aff[P.id] = Math.round((affOf(P) - ITEM_COST) * 10) / 10; prog.items[k] = true; saveProg();
-  logThem(convo(P), voice(P, `${ITEMS[k].name} 선물이에요! 💝 한 판에 한 번씩 꼭 필요할 때 써요.`));
+  logThem(convo(P), voice(P, tr('{n} 선물이에요! 💝 꼭 필요할 때 써요.', { n: ITEMS[k].name })));
   updateAffUI(); panelKey = ''; itemsKey = '';
   if (inLobby) renderLobby();
 }
@@ -2481,13 +2943,13 @@ function renderItemsBar() {
     let st, act;
     const nOn = k === 'secret1' ? S.planes.length : S.hazards.filter(h => h.type === k).length;
     if (it.consumable) {
-      if (placing) { st = '길 칸을 고르세요 · 취소'; act = 'use'; }
-      else { st = `💗 ${ITEM_COST}씩 · ` + (it.place ? '1분' : '출격') + (nOn ? `<span class="cnt"> · ${nOn}${it.place ? '개 놓임' : '대 비행 중'}</span>` : ''); act = 'use'; b.disabled = S.over || !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
+      if (placing) { st = tr('길 칸을 고르세요 · 취소'); act = 'use'; }
+      else { st = tr('💗 {c}씩 · ', { c: ITEM_COST }) + (it.place ? tr('1분') : tr('출격')) + (nOn ? `<span class="cnt"> · ${nOn}${it.place ? tr('개 놓임') : tr('대 비행 중')}</span>` : ''); act = 'use'; b.disabled = S.over || !P || aff < ITEM_COST; b.title = P ? tr('{n}의 호감도 {a}', { n: P.name, a: aff }) : tr('대화 상대를 먼저 고르세요'); }
       b.classList.remove('locked');
-    } else if (!own) { st = `💗 ${ITEM_COST}로 구매`; act = 'buy'; b.disabled = !P || aff < ITEM_COST; b.title = P ? `${P.name}의 호감도 ${aff}` : '대화 상대를 먼저 고르세요'; }
-    else if (used) { st = '이번 판 사용함'; act = ''; b.disabled = true; }
-    else if (placing) { st = '길 칸을 고르세요 · 취소'; act = 'use'; }
-    else { st = it.place ? '눌러서 길에 놓기' : '눌러서 출격'; act = 'use'; b.disabled = S.over; }
+    } else if (!own) { st = tr('💗 {c}로 구매', { c: ITEM_COST }); act = 'buy'; b.disabled = !P || aff < ITEM_COST; b.title = P ? tr('{n}의 호감도 {a}', { n: P.name, a: aff }) : tr('대화 상대를 먼저 고르세요'); }
+    else if (used) { st = tr('이번 판 사용함'); act = ''; b.disabled = true; }
+    else if (placing) { st = tr('길 칸을 고르세요 · 취소'); act = 'use'; }
+    else { st = it.place ? tr('눌러서 길에 놓기') : tr('눌러서 출격'); act = 'use'; b.disabled = S.over; }
     b.dataset.item = k; b.dataset.act = act;
     b.innerHTML = `<canvas width="72" height="72" aria-hidden="true"></canvas><span><span class="nm">${it.name}</span><span class="st">${st}</span></span>`;
     drawItemIcon(b.querySelector('canvas'), k);
@@ -2495,8 +2957,8 @@ function renderItemsBar() {
   }
   // 오른쪽 끝: 지금 대화 상대의 호감도. 아이템을 쓰면 여기서 줄어드는 게 보이고, 누르면 대화창이 열립니다.
   const box = document.createElement('button'); box.type = 'button'; box.className = 'affbox'; box.dataset.affbox = '1';
-  box.title = P ? `${P.name}의 호감도 · 눌러서 대화` : '대화 상대를 먼저 고르세요';
-  box.innerHTML = `<span class="ah">💗</span><span class="av mono">${P ? aff : '–'}</span><span class="an">${P ? P.name : '상대 없음'}</span>`;
+  box.title = P ? tr('{n}의 호감도 · 눌러서 대화', { n: P.name }) : tr('대화 상대를 먼저 고르세요');
+  box.innerHTML = `<span class="ah">💗</span><span class="av mono">${P ? aff : '–'}</span><span class="an">${P ? P.name : tr('상대 없음')}</span>`;
   if (P && lastBarAff && lastBarAff.id === P.id && aff !== lastBarAff.v) {
     const d = document.createElement('span'); d.className = 'adelta ' + (aff < lastBarAff.v ? 'down' : 'up'); d.textContent = (aff < lastBarAff.v ? '−' : '+') + Math.abs(aff - lastBarAff.v);
     box.appendChild(d); box.classList.add(aff < lastBarAff.v ? 'drop' : 'gain');
@@ -2514,12 +2976,12 @@ $('itemsBar').addEventListener('click', e => {
 });
 function renderAffShop() {
   const P = curP(), aff = P ? Math.floor(affOf(P)) : 0;
-  $('affNote').innerHTML = P ? `지금 대화 상대 <b>${P.name}</b>의 호감도: <b>💗 ${aff}</b>. 대화할수록 천천히 오릅니다.` : '오른쪽 아래 💬 버튼에서 대화 상대를 먼저 고르세요. 대화할수록 호감도가 천천히 오릅니다.';
+  $('affNote').innerHTML = P ? tr('지금 대화 상대 <b>{n}</b>의 호감도: <b>💗 {a}</b>. 대화할수록 천천히 오릅니다.', { n: P.name, a: aff }) : tr('오른쪽 아래 💬 버튼에서 대화 상대를 먼저 고르세요. 대화할수록 호감도가 천천히 오릅니다.');
   $('affShop').innerHTML = ITEM_KEYS.map(k => {
     const it = ITEMS[k], own = !!prog.items[k], can = P && aff >= ITEM_COST;
     return `<div class="acard" style="--ic:${it.color}"><canvas width="88" height="88" data-icon="${k}" aria-hidden="true"></canvas><div>
       <div class="nm">${it.name}</div><div class="ds">${it.desc}</div>
-      ${it.consumable ? `<span class="owned">${it.place ? `게임 중 놓을 때마다 💗 ${ITEM_COST} · 1분 지속` : `게임 중 출격할 때마다 💗 ${ITEM_COST}`}</span>` : own ? '<span class="owned">보유 · 한 판에 한 번</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-buyitem="${k}" ${can ? '' : 'disabled'}>💗 ${ITEM_COST}로 구매</button>`}
+      ${it.consumable ? `<span class="owned">${it.place ? tr('게임 중 놓을 때마다 💗 {c} · 1분 지속', { c: ITEM_COST }) : tr('게임 중 출격할 때마다 💗 {c}', { c: ITEM_COST })}</span>` : own ? '<span class="owned">' + tr('보유 · 한 판에 한 번') + '</span>' : `<button class="btn sm ${can ? 'primary' : ''}" type="button" data-buyitem="${k}" ${can ? '' : 'disabled'}>${tr('💗 {c}로 구매', { c: ITEM_COST })}</button>`}
     </div></div>`;
   }).join('');
   for (const c of $('affShop').querySelectorAll('[data-icon]')) drawItemIcon(c, c.dataset.icon);
@@ -2528,29 +2990,30 @@ $('affShop').addEventListener('click', e => { const b = e.target.closest('[data-
 
 // ---------- weapon guide ----------
 const ROLE = { police: '단일 · 빠른 연사', fire: '단일 · 둔화', dump: '범위 · 포물선 포탄', bumper: '단일 · 밀어내기', crane: '범위 · 강한 한 방', flume: '주변 전체 · 정지', tank: '단일 · 최장 사거리', secret1: '단일 · 공중 사격 (임시 능력치)', secret2: '범위 · 불덩이 (임시 능력치)', secret3: '범위 · 물폭탄 (임시 능력치)' };
+if (IS_EN) Object.assign(ROLE, { police: 'Single · rapid fire', fire: 'Single · slows', dump: 'Area · arcing shell', bumper: 'Single · knockback', crane: 'Area · huge hit', flume: 'All around · freezes', tank: 'Single · longest range', secret1: 'Single · air strike (temporary stats)', secret2: 'Area · fireball (temporary stats)', secret3: 'Area · water bomb (temporary stats)' });
 let guideOpen = false;
 function openGuide(focus) {
   guideOpen = true;
   const pas = SKILLS.filter(k => ['dmg', 'aspd'].includes(k.id) && skillLv(k.id) > 0).map(k => k.fmt(skillVal(k.id)));
-  $('guideNote').textContent = '표의 수치는 패시브·퀴즈 보너스를 빼고 레벨별 기본값입니다. 초당 피해는 적 한 대를 맞혔을 때 기준입니다.' + (pas.length ? ' 지금 적용 중인 패시브: ' + pas.join(', ') + '.' : '');
+  $('guideNote').textContent = tr('표의 수치는 패시브·퀴즈 보너스를 빼고 레벨별 기본값입니다. 초당 피해는 적 한 대를 맞혔을 때 기준입니다.') + (pas.length ? ' ' + tr('지금 적용 중인 패시브') + ': ' + pas.join(', ') + '.' : '');
   $('guideList').innerHTML = '';
   for (const type of ORDER) {
     const d = TOWERS[type], L = [1, 2, 3].map(lv => stats({ type, lv }, true));
     const row = (label, f) => `<tr><th scope="row">${label}</th>${L.map((s, i) => `<td>${f(s, i)}</td>`).join('')}</tr>`;
     let rows = d.income
-      ? row('웨이브당 채굴', s => s.income + ' 금화')
-      : row('피해', s => fmt(s.dmg)) + row('사거리', s => fmt(s.range / T) + '칸') + row('공격 간격', s => s.rate.toFixed(2) + '초') + row('초당 피해', s => fmt(s.dmg / s.rate));
-    if (d.slow) rows += row('둔화', s => Math.round(s.slow * 100) + '% · ' + s.slowDur + '초');
-    if (d.splash) rows += row('폭발 반경', s => fmt(s.splash / T) + '칸');
-    if (d.knock) rows += row('밀어내기 (검은 택시 기준)', s => fmt(s.knock / T) + '칸');
-    if (d.freeze) rows += row('정지', s => s.freeze.toFixed(1) + '초');
-    rows += row('강화 비용', (s, i) => i === 0 ? '—' : upCost({ type, lv: i }) + ' 금화');
+      ? row(tr('웨이브당 채굴'), s => s.income + ' ' + tr('금화'))
+      : row(tr('피해'), s => fmt(s.dmg)) + row(tr('사거리'), s => tr('{n}칸', { n: fmt(s.range / T) })) + row(tr('공격 간격'), s => s.rate.toFixed(2) + tr('초')) + row(tr('초당 피해'), s => fmt(s.dmg / s.rate));
+    if (d.slow) rows += row(tr('둔화'), s => Math.round(s.slow * 100) + '% · ' + s.slowDur + tr('초'));
+    if (d.splash) rows += row(tr('폭발 반경'), s => tr('{n}칸', { n: fmt(s.splash / T) }));
+    if (d.knock) rows += row(tr('밀어내기 (검은 택시 기준)'), s => tr('{n}칸', { n: fmt(s.knock / T) }));
+    if (d.freeze) rows += row(tr('정지'), s => s.freeze.toFixed(1) + tr('초'));
+    rows += row(tr('강화 비용'), (s, i) => i === 0 ? '—' : upCost({ type, lv: i }) + ' ' + tr('금화'));
     const own = isUnlocked(type);
     const c = document.createElement('article'); c.className = 'wcard' + (type === focus ? ' focus' : ''); c.style.setProperty('--wc', d.color); c.id = 'w-' + type;
     c.innerHTML = `<div class="whead"><canvas width="96" height="96" aria-hidden="true"></canvas><div><h3>${d.name}</h3><div class="wrole">${ROLE[type]}</div></div>
-        <div class="wmeta"><span class="cost">${d.cost} 금화</span><span>${own ? '보유' : '🔒 ' + d.ap + ' AP'}</span></div></div>
+        <div class="wmeta"><span class="cost">${d.cost} ${tr('금화')}</span><span>${own ? tr('보유') : '🔒 ' + d.ap + ' AP'}</span></div></div>
       <p>${d.desc}</p>
-      ${d.knock ? `<p class="knote">총체력에 따라 밀리는 거리: ${Object.values(ENEMIES).map(en => `${en.name} ×${knockFactorOf(en.hp).toFixed(2)}`).join(' · ')}</p>` : ''}
+      ${d.knock ? `<p class="knote">${tr('총체력에 따라 밀리는 거리')}: ${Object.values(ENEMIES).map(en => `${en.name} ×${knockFactorOf(en.hp).toFixed(2)}`).join(' · ')}</p>` : ''}
       <div class="wtable"><table><thead><tr><th scope="col"></th><th scope="col">Lv.1</th><th scope="col">Lv.2</th><th scope="col">Lv.3</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     const cx = c.querySelector('canvas').getContext('2d'); cx.setTransform(1.6, 0, 0, 1.6, 0, 0); drawTower(cx, type, 30, 32, 1, -.7);
     $('guideList').appendChild(c);
