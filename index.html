@@ -3077,6 +3077,20 @@ window.claude?.hot?.snapshot?.(() => ({
   gold: S.gold, lives: S.lives, wave: S.waveActive ? S.wave - 1 : S.wave, over: S.over,
   towers: S.towers.map(t => ({ type: t.type, c: t.c, r: t.r, lv: t.lv, invested: t.invested, kills: t.kills, buff: t.buff || 1 })),
 }));
+// itch.io 같은 임베드(iframe)는 스크롤을 막아 두는 경우가 있어, 휠로 직접 페이지를 내립니다. 채팅·가이드처럼 안쪽에서 스크롤되는 영역 위에서는 건드리지 않습니다.
+if (window.top !== window) {
+  addEventListener('wheel', e => {
+    if (e.ctrlKey || e.defaultPrevented) return;
+    for (let el = e.target; el && el !== document.body && el.nodeType === 1; el = el.parentElement) {
+      const oy = getComputedStyle(el).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return;
+    }
+    const root = document.scrollingElement;
+    if (root.scrollHeight <= root.clientHeight) return;
+    e.preventDefault();
+    scrollBy(0, e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY);
+  }, { passive: false });
+}
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
