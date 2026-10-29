@@ -169,13 +169,14 @@ canvas#game.rot { aspect-ratio: 10 / 16; }
     padding: 8px 10px; min-height: 0; gap: 6px; font-size: 12px; align-content: start; box-shadow: 0 -10px 40px rgba(0, 0, 0, .55); border-color: var(--brass);
   }
   .panel .tip, .panel .passives { display: none; }
-  .panel.sheet .sheet-x { position: absolute; top: 5px; right: 6px; height: 28px; padding: 0 10px; justify-content: center; align-items: center; font-size: 12px; }
-  .panel.sheet h3 { padding-right: 60px; font-size: 14px; min-height: 22px; align-items: center; }
+  .panel.sheet .sheet-x { position: absolute; top: 4px; right: 6px; height: 36px; min-height: 0; padding: 0 12px; justify-content: center; align-items: center; font-size: 12px; }
+  .panel.sheet h3 { padding-right: 72px; font-size: 14px; min-height: 30px; align-items: center; }
   .panel.sheet[style*="top"] { max-height: none; }
   .panel.sheet p { font-size: 11.5px; line-height: 1.35; }
   .panel.sheet .kv { grid-template-columns: auto 1fr auto 1fr; gap: 1px 8px; font-size: 11.5px; }
   .panel.sheet .row { gap: 6px; }
-  .panel.sheet .btn { padding: 6px 10px; font-size: 13px; }
+  .panel.sheet .btn { padding: 6px 12px; font-size: 14px; min-height: 42px; }
+  .panel.sheet .row { margin-top: 2px; }
   .panel.sheet > .btn[data-act="guide"], .panel.sheet .row .btn[data-act="guide"] { display: none; }
   .panel:not(.sheet) .sheet-x { display: none; }
   .btn { padding: 8px 12px; font-size: 13px; }
