@@ -3090,6 +3090,17 @@ if (window.top !== window) {
     e.preventDefault();
     scrollBy(0, e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY);
   }, { passive: false });
+  // 휴대폰 터치도 같은 이유로 막혀 있어서 손가락으로 끄는 만큼 직접 내립니다.
+  let ty = null, tScroll = false;
+  const inner = t => { for (let el = t; el && el !== document.body && el.nodeType === 1; el = el.parentElement) { const oy = getComputedStyle(el).overflowY; if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return true; } return false; };
+  addEventListener('touchstart', e => { ty = e.touches.length === 1 ? e.touches[0].clientY : null; tScroll = ty !== null && !inner(e.target); }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (ty === null || !tScroll) return;
+    const root = document.scrollingElement, y = e.touches[0].clientY;
+    if (root.scrollHeight <= root.clientHeight) return;
+    if (e.cancelable) e.preventDefault();
+    scrollBy(0, ty - y); ty = y;
+  }, { passive: false });
 }
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
