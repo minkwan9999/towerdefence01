@@ -660,9 +660,9 @@ const ENEMIES = {
   boss:   { name: '검은 탱크',     car: 'tank',   hp: 1600, speed: .5,   reward: 150, lives: 10, scale: 1.25 },
 };
 const ER = 16;
-// 검은 차량의 공격: 가까운 무기를 향해 작은 포탄을 쏩니다. 내구도가 0이 되면 무기는 잠깐 고장 났다가 절반 내구도로 스스로 고쳐집니다(사라지지 않습니다).
-const ATK = { grunt: { dmg: 5, cd: 3.2, range: 1.7 }, brute: { dmg: 13, cd: 2.6, range: 2 }, boss: { dmg: 24, cd: 1.8, range: 2.7 } };
-const towerMax = t => 70 + 35 * (t.lv - 1);
+// 검은 차량의 공격: 가까운 무기를 향해 작은 포탄을 쏩니다. 내구도가 0이 되면 무기는 4초 고장 났다가 내구도 60%로 스스로 고쳐집니다(사라지지 않습니다).
+const ATK = { grunt: { dmg: 3, cd: 4, range: 1.5 }, brute: { dmg: 7, cd: 3.2, range: 1.8 }, boss: { dmg: 12, cd: 2.4, range: 2.5 } };
+const towerMax = t => 100 + 50 * (t.lv - 1);
 
 function stats(t, raw) {
   const d = TOWERS[t.type], k = t.lv - 1;
@@ -718,7 +718,8 @@ const SND = (() => {
     if (!ac) {
       try {
         ac = new (window.AudioContext || window.webkitAudioContext)();
-        master = ac.createGain(); master.gain.value = muted ? 0 : 1; master.connect(ac.destination);
+        master = ac.createGain(); master.gain.value = muted ? 0 : 1;
+        const comp = ac.createDynamicsCompressor(); master.connect(comp); comp.connect(ac.destination); // 소리가 겹쳐도 찢어지지 않게
         sfx = ac.createGain(); sfx.gain.value = .6; sfx.connect(master);
         mus = ac.createGain(); mus.gain.value = .5; mus.connect(master);
         noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
@@ -745,7 +746,7 @@ const SND = (() => {
   function play(key, gap, fn) {
     if (muted || !ac || ac.state !== 'running') return;
     const now = performance.now(); if (now - (last[key] || 0) < gap) return; last[key] = now;
-    try { fn(ac.currentTime + .005); } catch (err) { /* sound is optional */ }
+    try { fn(ac.currentTime + .005); } catch (err) { if (me.debug) console.error(err); }
   }
   const notes = (t, list, type, vol, dur, gap) => list.forEach((f, i) => tone(sfx, t + i * gap, f, f, dur, type, vol));
   me.shoot = type => play('s' + type, 45, t => {
@@ -802,7 +803,7 @@ const SND = (() => {
     if (m) { if (master) master.gain.setTargetAtTime(0, ac.currentTime, .05); }
     else { me.unlock(); if (master) master.gain.setTargetAtTime(1, ac.currentTime, .05); }
   };
-  me.state = () => ({ muted, running: !!ac && ac.state === 'running' });
+  me.state = () => ({ muted, running: !!ac && ac.state === 'running', step });
   Object.defineProperty(me, 'muted', { get: () => muted });
   for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, () => me.unlock(), { passive: true });
   document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend(); else ac.resume(); });
@@ -825,6 +826,14 @@ const cam = { x: 0, y: 0, zoom: true };
 const zoomOf = () => (ROT && cam.zoom ? ZOOM : 1);
 function clampCam() { const z = zoomOf(); cam.x = Math.max(0, Math.min(W - W / z, cam.x)); cam.y = Math.max(0, Math.min(H - H / z, cam.y)); }
 function focusStart() { const z = zoomOf(); cam.x = 0; cam.y = PTS[0].y - H / z / 2; clampCam(); }
+// 확대했을 때 오른쪽 아래에 작은 지도를 띄웁니다: 길·무기·적과 지금 보는 구역. 누르거나 끌면 그쪽으로 옮깁니다.
+const MINI = { k: .16 };
+MINI.w = H * MINI.k; MINI.h = W * MINI.k; MINI.x = H - 8 - MINI.w; MINI.y = W - 8 - MINI.h;
+function miniJump(lx, ly) {
+  const z = zoomOf(), x = (ly - MINI.y) / MINI.k, y = H - (lx - MINI.x) / MINI.k;
+  cam.x = x - W / z / 2; cam.y = y - H / z / 2; clampCam();
+}
+const inMini = (lx, ly) => lx >= MINI.x - 6 && lx <= MINI.x + MINI.w + 6 && ly >= MINI.y - 6 && ly <= MINI.y + MINI.h + 6;
 const viewCenter = () => { const z = zoomOf(); return { x: cam.x + W / z / 2, y: cam.y + H / z / 2 }; };
 
 // ---------- canvas ----------
@@ -1592,7 +1601,7 @@ function place(type, c, r) {
   const cost = TOWERS[type].cost;
   if (!canPlace(c, r) || S.gold < cost) return false;
   S.gold -= cost;
-  const t = { type, c, r, x: (c + .5) * T, y: (r + .5) * T, lv: 1, cd: 0, ang: -Math.PI / 2, invested: cost, kills: 0, hp: 70, down: 0, hitT: 0, calm: 0, pop: .3 };
+  const t = { type, c, r, x: (c + .5) * T, y: (r + .5) * T, lv: 1, cd: 0, ang: -Math.PI / 2, invested: cost, kills: 0, hp: 100, down: 0, hitT: 0, calm: 0, pop: .3 };
   S.towers.push(t); occ.set(c + ',' + r, t);
   ring(t.x, t.y, 10, 34, TOWERS[type].color, .35); SND.place();
   return true;
@@ -1653,10 +1662,10 @@ function spawn(type) {
 function slowDown(e, slow, dur) { if (e.slowT <= 0 || slow >= e.slowF) e.slowF = slow; e.slowT = Math.max(e.slowT, dur); }
 function hitTower(t, dmg) {
   if (t.down > 0) return;
-  t.hp -= dmg; t.hitT = .2; t.calm = 3;
+  t.hp -= dmg; t.hitT = .2; t.calm = 2;
   floatText(t.x, t.y - 22, '-' + Math.ceil(dmg), '#e65a4f'); sparks(t.x, t.y, '#e65a4f', 5); SND.thit();
   if (t.hp <= 0) {
-    t.hp = 0; t.down = 6; ring(t.x, t.y, 8, 40, '#8a8f92', .5); floatText(t.x, t.y - 38, tr('고장!'), '#c9c2b4'); SND.tdown();
+    t.hp = 0; t.down = 4; ring(t.x, t.y, 8, 40, '#8a8f92', .5); floatText(t.x, t.y - 38, tr('고장!'), '#c9c2b4'); SND.tdown();
   }
 }
 function fire(t, e, st) {
@@ -1694,6 +1703,7 @@ const knockFactor = e => knockFactorOf(e.maxHp / (e.hpScale || 1));
 const ARC_KINDS = new Set(['rock', 'wreck', 'fireball', 'blob', 'bomb']);
 const espeed = e => ENEMIES[e.type].speed * T * (e.slowT > 0 ? 1 - e.slowF : 1) * (S.slowAll > 0 ? .8 : 1) * dmult(S.diff) * (1 - skillVal('slow') / 100);
 function update(dt) {
+  if (S.flashT > 0) S.flashT -= dt;
   for (const f of S.fx) { f.life -= dt; if (f.k === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } if (f.k === 'text') f.y -= 26 * dt; }
   S.fx = S.fx.filter(f => f.life > 0);
   if (S.over) return;
@@ -1710,7 +1720,7 @@ function update(dt) {
     if (e.fireT > 0) e.fireT -= dt;
     if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
     e.d += espeed(e) * dt;
-    if (e.d >= PATH_LEN) { e.alive = false; S.lives -= ENEMIES[e.type].lives; SND.gate(); ring(W - 14, PTS[PTS.length - 1].y, 6, 50, '#e65a4f', .5); continue; }
+    if (e.d >= PATH_LEN) { e.alive = false; S.lives -= ENEMIES[e.type].lives; SND.gate(); S.flashT = .45; ring(W - 14, PTS[PTS.length - 1].y, 6, 50, '#e65a4f', .5); continue; }
     const p = posAt(e.d); e.x = p.x; e.y = p.y;
   }
   updateHazards(dt);
@@ -1737,10 +1747,10 @@ function update(dt) {
     if (t.hitT > 0) t.hitT -= dt;
     if (t.down > 0) {
       t.down -= dt;
-      if (t.down <= 0) { t.down = 0; t.hp = Math.ceil(towerMax(t) * .5); ring(t.x, t.y, 6, 34, '#a5d46a', .4); floatText(t.x, t.y - 22, tr('수리 완료'), '#a5d46a'); SND.trep(); }
+      if (t.down <= 0) { t.down = 0; t.hp = Math.ceil(towerMax(t) * .6); ring(t.x, t.y, 6, 34, '#a5d46a', .4); floatText(t.x, t.y - 22, tr('수리 완료'), '#a5d46a'); SND.trep(); }
       continue;
     }
-    if (t.calm > 0) t.calm -= dt; else if (t.hp < towerMax(t)) t.hp = Math.min(towerMax(t), t.hp + towerMax(t) * .05 * dt);
+    if (t.calm > 0) t.calm -= dt; else if (t.hp < towerMax(t)) t.hp = Math.min(towerMax(t), t.hp + towerMax(t) * .06 * dt);
     if (TOWERS[t.type].income) continue;
     t.cd -= dt; const st = stats(t), r2 = st.range * st.range;
     let best = null;
@@ -1841,7 +1851,7 @@ function render() {
     drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
     if (t.down > 0) {
       ctx.fillStyle = 'rgba(18, 20, 20, .6)'; rr(ctx, t.x - 26, t.y - 26, 52, 52, 6); ctx.fill();
-      ctx.strokeStyle = '#a5d46a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(t.x, t.y, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - t.down / 6)); ctx.stroke();
+      ctx.strokeStyle = '#a5d46a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(t.x, t.y, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - t.down / 4)); ctx.stroke();
       ctx.fillStyle = 'rgba(190, 190, 190, .5)'; for (let i = 0; i < 3; i++) { const k = ((performance.now() / 900 + i / 3) % 1); circle(ctx, t.x - 6 + i * 6 + Math.sin(k * 6) * 3, t.y - 8 - k * 20, 3 + k * 4); ctx.fill(); }
     } else if (t.hitT > 0) { ctx.fillStyle = 'rgba(230, 90, 79,' + t.hitT * 1.6 + ')'; rr(ctx, t.x - 26, t.y - 26, 52, 52, 6); ctx.fill(); }
     if (TS !== 1) ctx.restore();
@@ -1932,6 +1942,25 @@ function render() {
   if (paused && !S.over) {
     ctx.fillStyle = 'rgba(8,14,12,.5)'; ctx.fillRect(0, 0, W, H);
     const vc = viewCenter(); ctx.font = '400 ' + Math.round(44 / zm) + 'px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctxText('fillText', IS_EN ? 'Paused' : '일시정지', vc.x, vc.y + 14 / zm);
+  }
+  // ---- 화면 고정 표시(확대·회전과 무관): 성문 피격 테두리, 작은 지도 ----
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const sw = ROT ? H : W, sh = ROT ? W : H;
+  if (S.flashT > 0 && !reduceMotion) {
+    ctx.fillStyle = 'rgba(230, 60, 50,' + Math.min(.55, S.flashT * 1.4) + ')';
+    ctx.fillRect(0, 0, sw, 10); ctx.fillRect(0, sh - 10, sw, 10); ctx.fillRect(0, 0, 10, sh); ctx.fillRect(sw - 10, 0, 10, sh);
+  }
+  if (ROT && zm > 1 && !S.over) {
+    const mx = (x, y) => MINI.x + (H - y) * MINI.k, my = (x, y) => MINI.y + x * MINI.k;
+    ctx.fillStyle = 'rgba(8, 14, 12, .72)'; ctx.strokeStyle = 'rgba(235, 230, 211, .5)'; ctx.lineWidth = 1;
+    rr(ctx, MINI.x - 3, MINI.y - 3, MINI.w + 6, MINI.h + 6, 5); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#a58a5a'; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.beginPath();
+    PTS.forEach((p, i) => i ? ctx.lineTo(mx(p.x, p.y), my(p.x, p.y)) : ctx.moveTo(mx(p.x, p.y), my(p.x, p.y))); ctx.stroke();
+    const gp = PTS[PTS.length - 1]; ctx.fillStyle = '#e2b54a'; ctx.fillRect(mx(gp.x, gp.y) - 3, my(gp.x, gp.y) - 2, 6, 4);
+    for (const t of S.towers) { ctx.fillStyle = t.down > 0 ? '#777' : TOWERS[t.type].color; ctx.fillRect(mx(t.x, t.y) - 2, my(t.x, t.y) - 2, 4, 4); }
+    for (const en of S.enemies) { ctx.fillStyle = '#e65a4f'; circle(ctx, mx(en.x, en.y), my(en.x, en.y), en.type === 'boss' ? 3.5 : 2); ctx.fill(); }
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(MINI.x + (H - (cam.y + H / zm)) * MINI.k, MINI.y + cam.x * MINI.k, H / zm * MINI.k, W / zm * MINI.k);
   }
 }
 
@@ -2189,19 +2218,26 @@ function tileAt(ev) {
 }
 // 확대한 화면(휴대폰)에서는 손가락으로 끌어 옮깁니다. 조금(9px) 넘게 움직이면 끌기, 그보다 적으면 탭으로 칩니다.
 let drag = null, dragMoved = false;
+const logicalOf = ev => { const r = cv.getBoundingClientRect(); return [(ev.clientX - r.left) / r.width * H, (ev.clientY - r.top) / r.height * W]; };
+let miniDrag = false;
 cv.addEventListener('pointerdown', e => {
   hover = tileAt(e);
-  if (ROT && zoomOf() > 1 && e.isPrimary) { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }; dragMoved = false; }
+  if (ROT && zoomOf() > 1 && e.isPrimary) {
+    const [lx, ly] = logicalOf(e);
+    if (inMini(lx, ly)) { miniDrag = true; dragMoved = true; miniJump(lx, ly); return; }
+    drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }; dragMoved = false;
+  }
 });
 cv.addEventListener('pointermove', e => {
   hover = tileAt(e);
+  if (miniDrag) { const [lx, ly] = logicalOf(e); miniJump(lx, ly); return; }
   if (!drag) return;
   if (!dragMoved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 9) return;
   dragMoved = true;
   const k = H / cv.getBoundingClientRect().width, z = zoomOf();
   cam.y = drag.cy + (e.clientX - drag.x) * k / z; cam.x = drag.cx - (e.clientY - drag.y) * k / z; clampCam();
 });
-const endDrag = () => { drag = null; };
+const endDrag = () => { drag = null; miniDrag = false; };
 cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
 document.getElementById('zoomBtn').addEventListener('click', () => { cam.zoom = !cam.zoom; focusStart(); });
 cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hover = null; });
