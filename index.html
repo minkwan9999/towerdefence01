@@ -708,7 +708,7 @@ if (IS_EN) Object.assign(EN, {
   '고장!': 'Broken!',
   '수리 완료': 'Repaired',
   '내구도': 'Durability',
-  '드래그해서 화면 이동': 'Drag to move the view',
+  '끌어서 이동 · 두 손가락으로 확대/축소': 'Drag to move · pinch to zoom',
   '소리 설정': 'Sound settings', '닫기': 'Close', '배경음': 'Music', '효과음': 'Sound effects', '켜짐': 'On', '꺼짐': 'Off', '소리 확인': 'Test sound',
   '소리가 안 나면 휴대폰 볼륨과 무음 스위치(벨 모양)를 확인해 주세요. 아이폰은 무음 모드일 때 웹 게임 소리가 꺼질 수 있어요.': 'If you hear nothing, check your phone volume and the silent switch (bell icon). iPhones can mute web game sound in silent mode.',
   '소리 켜기': 'Turn sound on',
@@ -878,8 +878,11 @@ updateSoundUI();
 // ---------- camera ----------
 // 휴대폰 세로 화면에서는 맵을 1.7배로 확대해 적이 들어오는 쪽부터 보여 주고, 손가락으로 끌어서 옮깁니다. 🔍 버튼으로 전체 보기와 바꿉니다.
 const ZOOM = 1.7;
-const cam = { x: 0, y: 0, zoom: true };
-const zoomOf = () => (ROT && cam.zoom ? ZOOM : 1);
+const ZOOM_MIN = 1, ZOOM_MAX = 2.5;
+// 두 손가락 확대·축소: 손가락 사이를 좁히면 확대, 벌리면 축소합니다. 반대로 하려면 PINCH_IN_ZOOMS 를 false 로.
+const PINCH_IN_ZOOMS = true;
+const cam = { x: 0, y: 0, z: ZOOM };
+const zoomOf = () => (ROT ? cam.z : 1);
 function clampCam() { const z = zoomOf(); cam.x = Math.max(0, Math.min(W - W / z, cam.x)); cam.y = Math.max(0, Math.min(H - H / z, cam.y)); }
 function focusStart() { const z = zoomOf(); cam.x = 0; cam.y = PTS[0].y - H / z / 2; clampCam(); }
 // 확대했을 때 오른쪽 아래에 작은 지도를 띄웁니다: 길·무기·적과 지금 보는 구역. 누르거나 끌면 그쪽으로 옮깁니다.
@@ -1993,7 +1996,7 @@ function render() {
   }
   if (zm > 1 && S.wave === 0 && !S.waveActive && !paused) {
     ctx.font = '500 ' + Math.round(13 / zm) + 'px "IBM Plex Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(235,230,211,.85)';
-    ctxText('fillText', tr('드래그해서 화면 이동'), cam.x + W / zm - 34 / zm, cam.y + H / zm / 2);
+    ctxText('fillText', tr('끌어서 이동 · 두 손가락으로 확대/축소'), cam.x + W / zm - 34 / zm, cam.y + H / zm / 2);
   }
   if (paused && !S.over) {
     ctx.fillStyle = 'rgba(8,14,12,.5)'; ctx.fillRect(0, 0, W, H);
@@ -2273,19 +2276,38 @@ function tileAt(ev) {
   return c >= 0 && c < COLS && row >= 0 && row < ROWS ? { c, r: row, x, y } : null;
 }
 // 확대한 화면(휴대폰)에서는 손가락으로 끌어 옮깁니다. 조금(9px) 넘게 움직이면 끌기, 그보다 적으면 탭으로 칩니다.
-let drag = null, dragMoved = false;
+let drag = null, dragMoved = false, pinch = null, miniDrag = false;
+const ptrs = new Map();
 const logicalOf = ev => { const r = cv.getBoundingClientRect(); return [(ev.clientX - r.left) / r.width * H, (ev.clientY - r.top) / r.height * W]; };
-let miniDrag = false;
+// 두 손가락: 처음 가운데 점(세계 좌표)을 붙잡고 확대·축소하므로, 손가락 아래의 그 자리가 그대로 있습니다. 가운데를 옮기면 화면도 같이 옮겨집니다.
+function pinchState() {
+  const [a, b] = [...ptrs.values()], r = cv.getBoundingClientRect(), k = H / r.width;
+  return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, lx: ((a.x + b.x) / 2 - r.left) * k, ly: ((a.y + b.y) / 2 - r.top) * k };
+}
 cv.addEventListener('pointerdown', e => {
   hover = tileAt(e);
-  if (ROT && zoomOf() > 1 && e.isPrimary) {
-    const [lx, ly] = logicalOf(e);
-    if (inMini(lx, ly)) { miniDrag = true; dragMoved = true; miniJump(lx, ly); return; }
-    drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }; dragMoved = false;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!ROT) return;
+  if (ptrs.size === 2) {
+    const st = pinchState(), z = zoomOf();
+    pinch = { d0: st.d, z0: z, ax: cam.x + st.ly / z, ay: cam.y + (H - st.lx) / z };
+    drag = null; miniDrag = false; dragMoved = true; return;
   }
+  if (ptrs.size > 2) return;
+  dragMoved = false;
+  const [lx, ly] = logicalOf(e);
+  if (zoomOf() > 1 && inMini(lx, ly)) { miniDrag = true; dragMoved = true; miniJump(lx, ly); return; }
+  if (zoomOf() > 1) drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y };
 });
 cv.addEventListener('pointermove', e => {
   hover = tileAt(e);
+  if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && ptrs.size >= 2) {
+    const st = pinchState(), ratio = st.d / pinch.d0;
+    const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, PINCH_IN_ZOOMS ? pinch.z0 / ratio : pinch.z0 * ratio));
+    cam.z = z; cam.x = pinch.ax - st.ly / z; cam.y = pinch.ay - (H - st.lx) / z; clampCam();
+    return;
+  }
   if (miniDrag) { const [lx, ly] = logicalOf(e); miniJump(lx, ly); return; }
   if (!drag) return;
   if (!dragMoved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 9) return;
@@ -2293,9 +2315,13 @@ cv.addEventListener('pointermove', e => {
   const k = H / cv.getBoundingClientRect().width, z = zoomOf();
   cam.y = drag.cy + (e.clientX - drag.x) * k / z; cam.x = drag.cx - (e.clientY - drag.y) * k / z; clampCam();
 });
-const endDrag = () => { drag = null; miniDrag = false; };
+const endDrag = e => {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  drag = null; miniDrag = false;
+};
 cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
-document.getElementById('zoomBtn').addEventListener('click', () => { cam.zoom = !cam.zoom; focusStart(); });
+document.getElementById('zoomBtn').addEventListener('click', () => { cam.z = cam.z > ZOOM_MIN + .05 ? ZOOM_MIN : ZOOM; focusStart(); });
 cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hover = null; });
 cv.addEventListener('click', e => {
   if (dragMoved) { dragMoved = false; return; }
