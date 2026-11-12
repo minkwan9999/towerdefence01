@@ -1143,16 +1143,42 @@ function drawWeapon(g, type, ang, t, noShadow) {
 // 레벨이 오를수록 받침대·테두리·무기 크기·표식이 달라집니다: 1 기본(청동 점) → 2 은빛 테두리 → 3 금빛 후광과 별.
 const LV_LOOK = [
   { pad: '#2b3230', rim: '#3f4945', corner: 'rgba(235,230,211,.55)', scale: 1 },
-  { pad: '#2c3a47', rim: '#aab6c2', corner: 'rgba(205,218,230,.9)', scale: 1.08 },
-  { pad: '#3b3322', rim: '#e2b54a', corner: 'rgba(255,222,130,.95)', scale: 1.16 },
+  { pad: '#2c3a47', rim: '#aab6c2', corner: 'rgba(205,218,230,.9)', scale: 1.14 },
+  { pad: '#3b3322', rim: '#e2b54a', corner: 'rgba(255,222,130,.95)', scale: 1.3 },
 ];
 function star(g, x, y, r) {
   g.beginPath();
   for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr_ = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rr_, y + Math.sin(a) * rr_); }
   g.closePath(); g.fill();
 }
+// 2레벨: 은빛 지느러미 + 포구 띠. 3레벨: 금빛 날개 두 쌍 + 후광 + 돌아가는 불꽃 고리 + 포구 보석.
+function gearBack(g, lv, ang) {
+  if (lv < 2) return;
+  const gold = lv >= 3, m = gold ? '#e2b54a' : '#b9c6d3', d = gold ? '#8f6a14' : '#66737f', now = performance.now() / 1000;
+  if (gold) {
+    const gr = g.createRadialGradient(0, 0, 8, 0, 0, 38); gr.addColorStop(0, 'rgba(255, 214, 90, .5)'); gr.addColorStop(1, 'rgba(255, 214, 90, 0)');
+    g.fillStyle = gr; circle(g, 0, 0, 38); g.fill();
+    g.save(); g.rotate(now * .9); g.strokeStyle = 'rgba(255, 222, 130, .85)'; g.lineWidth = 2; g.setLineDash([5, 7]); circle(g, 0, 0, 31); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#fff2b0'; for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; circle(g, Math.cos(a) * 31, Math.sin(a) * 31, 2.4); g.fill(); } g.restore();
+  }
+  g.save(); g.rotate(ang); g.lineWidth = 1.5; g.strokeStyle = d; g.fillStyle = m;
+  for (const s of [-1, 1]) {
+    const w = gold ? 22 : 14;
+    g.beginPath(); g.moveTo(4, s * 10); g.lineTo(-w, s * (w + 4)); g.lineTo(-w + 5, s * 9); g.closePath(); g.fill(); g.stroke();
+    if (gold) { g.beginPath(); g.moveTo(10, s * 13); g.lineTo(-2, s * (w + 9)); g.lineTo(-7, s * 11); g.closePath(); g.fill(); g.stroke(); }
+  }
+  g.restore();
+}
+function gearFront(g, lv, ang) {
+  if (lv < 2) return;
+  const gold = lv >= 3, m = gold ? '#ffd24a' : '#d6e0ea', d = gold ? '#8f6a14' : '#66737f';
+  g.save(); g.rotate(ang); g.fillStyle = m; g.strokeStyle = d; g.lineWidth = 1.2;
+  g.fillRect(15, -7, 5, 14); g.strokeRect(15, -7, 5, 14);
+  if (gold) { g.fillRect(22, -5, 4, 10); g.strokeRect(22, -5, 4, 10); g.fillStyle = '#ff5a4f'; circle(g, 8, 0, 3); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = .8; g.stroke(); }
+  g.restore();
+}
 function drawTower(g, type, x, y, lv, ang, t) {
-  const L = LV_LOOK[Math.min(3, Math.max(1, lv)) - 1], pop = t && t.pop > 0 ? 1 + t.pop * .6 : 1;
+  const L = LV_LOOK[Math.min(3, Math.max(1, lv)) - 1], pop = t && t.pop > 0 ? 1 + t.pop * .9 : 1;
   g.save(); g.translate(x, y); if (pop !== 1) g.scale(pop, pop);
   // weapon pad
   if (lv >= 3) {
@@ -1165,11 +1191,13 @@ function drawTower(g, type, x, y, lv, ang, t) {
   g.strokeStyle = L.corner; g.lineWidth = 2;
   g.beginPath(); for (const [cx, cy, dx, dy] of [[-22, -22, 1, 1], [22, -22, -1, 1], [-22, 22, 1, -1], [22, 22, -1, -1]]) { g.moveTo(cx + dx * 7, cy); g.lineTo(cx, cy); g.lineTo(cx, cy + dy * 7); } g.stroke();
 
+  gearBack(g, lv, ang);
   g.save();
   if (L.scale !== 1) g.scale(L.scale, L.scale);
   const pc = paintOf(type);
   if (pc) drawWeaponPainted(g, type, ang, t, pc.hex); else drawWeapon(g, type, ang, t);
   g.restore();
+  gearFront(g, lv, ang);
   if (lv === 1) { g.fillStyle = '#e2b54a'; circle(g, 0, 22, 2.4); g.fill(); }
   else if (lv === 2) { g.strokeStyle = '#cfdbe6'; g.lineWidth = 2.2; g.lineCap = 'round'; for (const dx of [-5, 5]) { g.beginPath(); g.moveTo(dx - 4, 23.5); g.lineTo(dx, 19.5); g.lineTo(dx + 4, 23.5); g.stroke(); } g.lineCap = 'butt'; }
   else { g.fillStyle = '#ffd24a'; for (const dx of [-9, 0, 9]) star(g, dx, 21.5, 4.6); }
@@ -1571,7 +1599,7 @@ function place(type, c, r) {
 }
 function upgrade(t) {
   if (!t || t.lv >= 3) return; const c = upCost(t); if (S.gold < c) return;
-  S.gold -= c; t.invested += c; t.lv++; t.hp = towerMax(t); t.down = 0; t.pop = .4;
+  S.gold -= c; t.invested += c; t.lv++; t.hp = towerMax(t); t.down = 0; t.pop = .55;
   const col = t.lv >= 3 ? '#ffd24a' : '#d6e4f0';
   ring(t.x, t.y, 12, stats(t).range, '#e2b54a', .45); ring(t.x, t.y, 8, 58, col, .55); sparks(t.x, t.y, col, 20);
   floatText(t.x, t.y - 36, tr('레벨 업! Lv.{n}', { n: t.lv }), col); SND.up();
