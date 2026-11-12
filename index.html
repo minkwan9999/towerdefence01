@@ -879,8 +879,8 @@ updateSoundUI();
 // 휴대폰 세로 화면에서는 맵을 1.7배로 확대해 적이 들어오는 쪽부터 보여 주고, 손가락으로 끌어서 옮깁니다. 🔍 버튼으로 전체 보기와 바꿉니다.
 const ZOOM = 1.7;
 const ZOOM_MIN = 1, ZOOM_MAX = 2.5;
-// 두 손가락 확대·축소: 손가락 사이를 좁히면 확대, 벌리면 축소합니다. 반대로 하려면 PINCH_IN_ZOOMS 를 false 로.
-const PINCH_IN_ZOOMS = true;
+// 두 손가락 확대·축소: 손가락 사이를 벌리면 확대, 좁히면 축소합니다(일반적인 방식). 반대로 하려면 PINCH_IN_ZOOMS 를 true 로.
+const PINCH_IN_ZOOMS = false;
 const cam = { x: 0, y: 0, z: ZOOM };
 const zoomOf = () => (ROT ? cam.z : 1);
 function clampCam() { const z = zoomOf(); cam.x = Math.max(0, Math.min(W - W / z, cam.x)); cam.y = Math.max(0, Math.min(H - H / z, cam.y)); }
