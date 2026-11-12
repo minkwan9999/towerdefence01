@@ -421,7 +421,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   .panel { min-height: 0; padding: 8px 10px; gap: 6px; }
   .panel .kv { grid-template-columns: auto 1fr auto 1fr; gap: 1px 8px; font-size: 12px; }
   .panel .tip { display: none; }
+  .panel .btn { padding: 6px 12px; }
+  .panel .kv { line-height: 1.35; }
+  .panel h3 { font-size: 15px; }
 }
+.lang-row { gap: 8px; }
+.board .tools { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 6px; z-index: 3; }
+.board .tool { width: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 16px; line-height: 1; background: rgba(14, 23, 20, .72); border: 1px solid var(--line); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.board .tool[hidden] { display: none; }
+.board .tool:hover { border-color: var(--muted); }
+canvas#game.rot { touch-action: none; }
 </style>
 </head>
 <body>
@@ -443,7 +452,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   </header>
 
   <section class="lobby game-lobby" id="lobby" hidden>
-    <div class="lang-row"><button class="btn sm" id="langBtn" type="button" aria-label="언어 / Language">🌐 English</button></div>
+    <div class="lang-row"><button class="btn sm" id="soundBtnLobby" type="button"></button><button class="btn sm" id="langBtn" type="button" aria-label="언어 / Language">🌐 English</button></div>
     <p class="lobby-intro" data-t="intro">난이도를 고르고 20개 웨이브를 막으세요. <b>제한 시간 안에 클리어하면 업적 포인트</b>를 받습니다. 금화는 판이 끝나면 사라지고 업적 포인트만 남습니다. 같은 난이도를 몇 번이든 다시 할 수 있고, 모은 포인트로 패시브 스킬을 올리거나, 무기고에서 새 무기를 해제하거나, 맵의 장애물을 치웁니다(하나에 5 AP). 맵은 5종이고 판마다 무작위로 나옵니다. 난이도가 한 단계 오를 때마다 적의 체력과 속도가 1.2배가 됩니다.</p>
     <div class="section-label">난이도 선택</div>
     <div class="diffs" id="diffs"></div>
@@ -462,6 +471,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); out
   <div class="main game-only" id="mainGame">
     <div class="board">
       <canvas id="game" aria-label="타워 디펜스 게임판"></canvas>
+      <div class="tools"><button class="tool" id="soundBtn" type="button"></button><button class="tool" id="zoomBtn" type="button" hidden>🔍</button></div>
       <div class="overlay" id="overlay" hidden>
         <div class="card">
           <div class="eyebrow" id="ovEyebrow">전투 종료</div>
@@ -650,6 +660,9 @@ const ENEMIES = {
   boss:   { name: '검은 탱크',     car: 'tank',   hp: 1600, speed: .5,   reward: 150, lives: 10, scale: 1.25 },
 };
 const ER = 16;
+// 검은 차량의 공격: 가까운 무기를 향해 작은 포탄을 쏩니다. 내구도가 0이 되면 무기는 잠깐 고장 났다가 절반 내구도로 스스로 고쳐집니다(사라지지 않습니다).
+const ATK = { grunt: { dmg: 5, cd: 3.2, range: 1.7 }, brute: { dmg: 13, cd: 2.6, range: 2 }, boss: { dmg: 24, cd: 1.8, range: 2.7 } };
+const towerMax = t => 70 + 35 * (t.lv - 1);
 
 function stats(t, raw) {
   const d = TOWERS[t.type], k = t.lv - 1;
@@ -681,6 +694,139 @@ function buildWave(w) {
   return list;
 }
 
+// 새 문장의 영어. 아래 소리·카메라·적 공격 기능에서 씁니다.
+if (IS_EN) Object.assign(EN, {
+  '레벨 업! Lv.{n}': 'LEVEL UP! Lv.{n}',
+  '고장!': 'Broken!',
+  '수리 완료': 'Repaired',
+  '내구도': 'Durability',
+  '드래그해서 화면 이동': 'Drag to move the view',
+  '소리 켜기': 'Turn sound on',
+  '소리 끄기': 'Turn sound off',
+  '화면 확대 / 전체 보기': 'Zoom in / show whole map',
+  '검은 차량도 무기를 쏴요! 내구도가 다 닳으면 무기가 잠깐 고장 나지만 사라지진 않고 곧 고쳐져요. 강화하면 내구도가 가득 차요.': 'Black cars shoot back! A weapon whose durability runs out breaks for a moment, but it never disappears and gets repaired soon. Upgrading refills its durability.',
+});
+
+// ---------- sound ----------
+// 소리 파일 없이 WebAudio 로 만든 효과음과 배경음악입니다. 첫 터치나 키 입력 뒤에 시작하고, 소리 버튼으로 끄면 기억해 둡니다.
+const SND = (() => {
+  const KEY = 'canyonhold.mute';
+  let ac = null, master, sfx, mus, noiseBuf, muted = false, timer = 0, step = 0, nextT = 0;
+  const last = {}, me = { mood: 0 };
+  try { muted = localStorage.getItem(KEY) === '1'; } catch (e) { /* storage unavailable */ }
+  function ensure() {
+    if (!ac) {
+      try {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        master = ac.createGain(); master.gain.value = muted ? 0 : 1; master.connect(ac.destination);
+        sfx = ac.createGain(); sfx.gain.value = .6; sfx.connect(master);
+        mus = ac.createGain(); mus.gain.value = .5; mus.connect(master);
+        noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+        const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      } catch (err) { ac = null; return null; }
+    }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(out, t0, f0, f1, dur, type, vol, atk) {
+    const o = ac.createOscillator(), g = ac.createGain(); atk = atk || .004;
+    o.type = type; o.frequency.setValueAtTime(f0, t0);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    g.gain.setValueAtTime(.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + atk); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+    o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + dur + .03);
+  }
+  function noise(out, t0, dur, vol, type, f, q) {
+    const s = ac.createBufferSource(), flt = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noiseBuf; flt.type = type; flt.frequency.value = f; flt.Q.value = q || 1;
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+    s.connect(flt); flt.connect(g); g.connect(out); s.start(t0, Math.random() * .5); s.stop(t0 + dur + .03);
+  }
+  // 같은 소리가 너무 촘촘히 겹치지 않게 key 마다 최소 간격(ms)을 둡니다.
+  function play(key, gap, fn) {
+    if (muted || !ac || ac.state !== 'running') return;
+    const now = performance.now(); if (now - (last[key] || 0) < gap) return; last[key] = now;
+    try { fn(ac.currentTime + .005); } catch (err) { /* sound is optional */ }
+  }
+  const notes = (t, list, type, vol, dur, gap) => list.forEach((f, i) => tone(sfx, t + i * gap, f, f, dur, type, vol));
+  me.shoot = type => play('s' + type, 45, t => {
+    switch (type) {
+      case 'police': tone(sfx, t, 1100, 420, .07, 'square', .08); break;
+      case 'fire': tone(sfx, t, 320, 170, .12, 'sine', .2); noise(sfx, t, .05, .05, 'lowpass', 900); break;
+      case 'dump': tone(sfx, t, 140, 55, .16, 'sine', .32); noise(sfx, t, .1, .14, 'lowpass', 500); break;
+      case 'bumper': tone(sfx, t, 220, 520, .06, 'sine', .22); tone(sfx, t + .06, 520, 260, .1, 'sine', .2); break;
+      case 'crane': tone(sfx, t, 90, 38, .3, 'sine', .4); noise(sfx, t, .22, .2, 'lowpass', 380); break;
+      case 'flume': noise(sfx, t, .28, .12, 'highpass', 2500); tone(sfx, t, 1500, 700, .25, 'sine', .07); break;
+      case 'tank': tone(sfx, t, 620, 160, .12, 'sawtooth', .1); noise(sfx, t, .08, .08, 'lowpass', 1500); break;
+    }
+  });
+  me.hit = () => play('hit', 60, t => noise(sfx, t, .04, .07, 'bandpass', 1800, 2));
+  me.kill = () => play('kill', 50, t => { tone(sfx, t, 520, 980, .07, 'triangle', .16); tone(sfx, t + .05, 1318, 1318, .08, 'sine', .08); });
+  me.place = () => play('place', 30, t => { tone(sfx, t, 200, 120, .1, 'triangle', .32); noise(sfx, t, .05, .1, 'lowpass', 800); });
+  me.up = () => play('up', 100, t => notes(t, [523.25, 659.25, 783.99, 1046.5], 'triangle', .24, .22, .07));
+  me.sell = () => play('sell', 60, t => { tone(sfx, t, 1318, 1318, .08, 'square', .09); tone(sfx, t + .07, 1760, 1760, .16, 'square', .09); });
+  me.wave = () => play('wave', 500, t => { tone(sfx, t, 196, 196, .5, 'sawtooth', .1); tone(sfx, t, 247, 247, .5, 'sawtooth', .07); tone(sfx, t + .18, 294, 294, .4, 'sawtooth', .07); });
+  me.clear = () => play('clear', 300, t => notes(t, [523.25, 659.25, 783.99], 'triangle', .24, .3, .1));
+  me.win = () => play('win', 500, t => notes(t, [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5, 1318.5], 'triangle', .26, .3, .14));
+  me.lose = () => play('lose', 500, t => notes(t, [392, 349.2, 311.1, 233.1], 'sawtooth', .1, .5, .25));
+  me.gate = () => play('gate', 100, t => { tone(sfx, t, 110, 45, .3, 'sawtooth', .25); noise(sfx, t, .25, .2, 'lowpass', 500); });
+  me.eshot = () => play('es', 70, t => tone(sfx, t, 300, 150, .08, 'square', .05));
+  me.thit = () => play('th', 60, t => { noise(sfx, t, .08, .15, 'bandpass', 900, 1.5); tone(sfx, t, 180, 90, .1, 'square', .1); });
+  me.tdown = () => play('td', 200, t => { tone(sfx, t, 420, 70, .4, 'sawtooth', .18); noise(sfx, t, .3, .12, 'lowpass', 700); });
+  me.trep = () => play('tr', 200, t => notes(t, [440, 660, 880], 'triangle', .2, .14, .09));
+  me.item = () => play('item', 100, t => { tone(sfx, t, 660, 990, .12, 'sine', .25); tone(sfx, t + .08, 990, 1320, .14, 'sine', .2); });
+  me.ding = () => play('ding', 80, t => { tone(sfx, t, 880, 880, .22, 'sine', .2); tone(sfx, t + .09, 1320, 1320, .22, 'sine', .2); });
+
+  // 배경음악: A단조 코드 4마디(Am–F–C–G)를 돌립니다. 로비는 잔잔하게, 전투 준비 중은 아르페지오, 웨이브 중에는 드럼까지 얹습니다.
+  const ROOTS = [110, 87.31, 130.81, 98], CH = [[0, 3, 7], [0, 4, 7], [0, 4, 7], [0, 4, 7]], ARP = [0, 1, 2, 1];
+  const hz = (root, semi) => root * Math.pow(2, semi / 12), SPB = 60 / 100 / 4;
+  function schedule() {
+    if (!ac) return;
+    while (nextT < ac.currentTime + .25) {
+      const t = nextT; nextT += SPB;
+      const s = step++ % 64, bar = s >> 4, sb = s & 15, root = ROOTS[bar], tones = CH[bar], mood = me.mood;
+      if (muted || ac.state !== 'running' || t < ac.currentTime - .05) continue;
+      if (sb === 0) tones.forEach(semi => tone(mus, t, hz(root * 2, semi), hz(root * 2, semi), SPB * 16, 'triangle', .05, .3));
+      if (sb === 0 || sb === 8 || (mood === 2 && sb === 12)) tone(mus, t, root, root, SPB * 3, 'sine', .22);
+      if (mood === 0) { if (sb === 0 || sb === 6 || sb === 10) tone(mus, t, hz(root * 4, tones[(s >> 2) % 3]), hz(root * 4, tones[(s >> 2) % 3]), SPB * 4, 'sine', .07); }
+      else if (sb % 2 === 0) { const f = hz(root * 4, tones[ARP[(sb >> 1) % 4]]); tone(mus, t, f, f, SPB * 1.8, 'triangle', .07); }
+      if (mood === 2) {
+        if (sb === 0 || sb === 8) tone(mus, t, 130, 45, .14, 'sine', .38);
+        if (sb === 4 || sb === 12) noise(mus, t, .1, .12, 'bandpass', 1800);
+        if (sb % 2 === 0) noise(mus, t, .03, .05, 'highpass', 7000);
+      }
+    }
+  }
+  me.unlock = () => { if (!ensure()) return; if (!timer) { nextT = ac.currentTime + .1; timer = setInterval(schedule, 80); } };
+  me.setMuted = m => {
+    muted = m; try { localStorage.setItem(KEY, m ? '1' : '0'); } catch (err) { /* ignore */ }
+    if (m) { if (master) master.gain.setTargetAtTime(0, ac.currentTime, .05); }
+    else { me.unlock(); if (master) master.gain.setTargetAtTime(1, ac.currentTime, .05); }
+  };
+  me.state = () => ({ muted, running: !!ac && ac.state === 'running' });
+  Object.defineProperty(me, 'muted', { get: () => muted });
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, () => me.unlock(), { passive: true });
+  document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend(); else ac.resume(); });
+  return me;
+})();
+function updateSoundUI() {
+  for (const id of ['soundBtn', 'soundBtnLobby']) {
+    const b = document.getElementById(id); if (!b) continue;
+    b.textContent = SND.muted ? '🔇' : '🔊';
+    b.setAttribute('aria-pressed', String(!SND.muted)); b.setAttribute('aria-label', SND.muted ? tr('소리 켜기') : tr('소리 끄기')); b.title = b.getAttribute('aria-label');
+  }
+}
+for (const id of ['soundBtn', 'soundBtnLobby']) document.getElementById(id).addEventListener('click', () => { SND.setMuted(!SND.muted); updateSoundUI(); });
+updateSoundUI();
+
+// ---------- camera ----------
+// 휴대폰 세로 화면에서는 맵을 1.7배로 확대해 적이 들어오는 쪽부터 보여 주고, 손가락으로 끌어서 옮깁니다. 🔍 버튼으로 전체 보기와 바꿉니다.
+const ZOOM = 1.7;
+const cam = { x: 0, y: 0, zoom: true };
+const zoomOf = () => (ROT && cam.zoom ? ZOOM : 1);
+function clampCam() { const z = zoomOf(); cam.x = Math.max(0, Math.min(W - W / z, cam.x)); cam.y = Math.max(0, Math.min(H - H / z, cam.y)); }
+function focusStart() { const z = zoomOf(); cam.x = 0; cam.y = PTS[0].y - H / z / 2; clampCam(); }
+const viewCenter = () => { const z = zoomOf(); return { x: cam.x + W / z / 2, y: cam.y + H / z / 2 }; };
+
 // ---------- canvas ----------
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -692,6 +838,8 @@ function applyOrientation() {
   ROT = rot;
   cv.width = (ROT ? H : W) * dpr; cv.height = (ROT ? W : H) * dpr;
   cv.classList.toggle('rot', ROT);
+  const zb = document.getElementById('zoomBtn'); if (zb) zb.hidden = !ROT;
+  focusStart();
 }
 applyOrientation();
 // 휴대폰 세로 화면: CSS로 정한 맵 높이에서 실제로 넘친 만큼만 줄여 스크롤이 생기지 않게 합니다.
@@ -992,21 +1140,39 @@ function drawWeapon(g, type, ang, t, noShadow) {
   }
 }
 
+// 레벨이 오를수록 받침대·테두리·무기 크기·표식이 달라집니다: 1 기본(청동 점) → 2 은빛 테두리 → 3 금빛 후광과 별.
+const LV_LOOK = [
+  { pad: '#2b3230', rim: '#3f4945', corner: 'rgba(235,230,211,.55)', scale: 1 },
+  { pad: '#2c3a47', rim: '#aab6c2', corner: 'rgba(205,218,230,.9)', scale: 1.08 },
+  { pad: '#3b3322', rim: '#e2b54a', corner: 'rgba(255,222,130,.95)', scale: 1.16 },
+];
+function star(g, x, y, r) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr_ = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rr_, y + Math.sin(a) * rr_); }
+  g.closePath(); g.fill();
+}
 function drawTower(g, type, x, y, lv, ang, t) {
-  const d = TOWERS[type];
-  g.save(); g.translate(x, y);
+  const L = LV_LOOK[Math.min(3, Math.max(1, lv)) - 1], pop = t && t.pop > 0 ? 1 + t.pop * .6 : 1;
+  g.save(); g.translate(x, y); if (pop !== 1) g.scale(pop, pop);
   // weapon pad
-  g.fillStyle = '#2b3230'; rr(g, -26, -26, 52, 52, 6); g.fill();
-  g.strokeStyle = '#3f4945'; g.lineWidth = 1.5; g.stroke();
-  g.strokeStyle = 'rgba(235,230,211,.55)'; g.lineWidth = 2;
+  if (lv >= 3) {
+    const pulse = .5 + .5 * Math.sin(performance.now() / 330);
+    g.save(); g.shadowColor = '#ffd24a'; g.shadowBlur = 12 + 8 * pulse; g.fillStyle = L.pad; rr(g, -26, -26, 52, 52, 6); g.fill(); g.restore();
+  }
+  g.fillStyle = L.pad; rr(g, -26, -26, 52, 52, 6); g.fill();
+  g.strokeStyle = L.rim; g.lineWidth = [1.5, 2.5, 3][lv - 1] || 1.5; g.stroke();
+  if (lv >= 2) { g.strokeStyle = L.rim + '77'; g.lineWidth = 1; rr(g, -22.5, -22.5, 45, 45, 4); g.stroke(); }
+  g.strokeStyle = L.corner; g.lineWidth = 2;
   g.beginPath(); for (const [cx, cy, dx, dy] of [[-22, -22, 1, 1], [22, -22, -1, 1], [-22, 22, 1, -1], [22, 22, -1, -1]]) { g.moveTo(cx + dx * 7, cy); g.lineTo(cx, cy); g.lineTo(cx, cy + dy * 7); } g.stroke();
 
   g.save();
+  if (L.scale !== 1) g.scale(L.scale, L.scale);
   const pc = paintOf(type);
   if (pc) drawWeaponPainted(g, type, ang, t, pc.hex); else drawWeapon(g, type, ang, t);
   g.restore();
-  g.fillStyle = '#e2b54a';
-  for (let i = 0; i < lv; i++) { circle(g, -(lv - 1) * 4 + i * 8, 22, 2.4); g.fill(); }
+  if (lv === 1) { g.fillStyle = '#e2b54a'; circle(g, 0, 22, 2.4); g.fill(); }
+  else if (lv === 2) { g.strokeStyle = '#cfdbe6'; g.lineWidth = 2.2; g.lineCap = 'round'; for (const dx of [-5, 5]) { g.beginPath(); g.moveTo(dx - 4, 23.5); g.lineTo(dx, 19.5); g.lineTo(dx + 4, 23.5); g.stroke(); } g.lineCap = 'butt'; }
+  else { g.fillStyle = '#ffd24a'; for (const dx of [-9, 0, 9]) star(g, dx, 21.5, 4.6); }
   g.restore();
 }
 
@@ -1023,6 +1189,7 @@ function drawEnemy(g, e) {
     rr(g, e.x - r - 3, e.y - r * .8, (r + 3) * 2, r * 1.6, 5); g.fill(); g.stroke();
     g.strokeStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.moveTo(e.x - r + 2, e.y - r * .4); g.lineTo(e.x - r + 8, e.y - r * .7); g.stroke();
   } else if (e.slowT > 0) { g.strokeStyle = 'rgba(155,214,90,.85)'; g.lineWidth = 2; circle(g, e.x, e.y, r + 3); g.stroke(); }
+  if (e.fireT > 0) { g.fillStyle = 'rgba(255,120,90,' + Math.min(1, e.fireT * 7) + ')'; circle(g, e.x, e.y, r * .7); g.fill(); }
   if (e.hp < e.maxHp) {
     const w = Math.max(22, r * 2), p = Math.max(0, e.hp / e.maxHp);
     g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(e.x - w / 2, e.y - r - 10, w, 4);
@@ -1382,10 +1549,10 @@ let S, occ, build = null, hover = null, sel = null, speed = 1, paused = false, t
 // 웨이브는 자동으로 이어집니다: 첫 웨이브는 준비 시간 뒤, 다음 웨이브는 앞 웨이브를 막고 잠시 뒤 시작합니다. 버튼으로 바로 부를 수도 있습니다.
 const FIRST_WAVE_DELAY = 12, NEXT_WAVE_DELAY = 5;
 function reset(diff) {
-  S = { prevMap: S ? S.map : -1, diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: FIRST_WAVE_DELAY, slowAll: 0, itemUsed: {}, hazards: [], planes: [] };
+  S = { eproj: [], prevMap: S ? S.map : -1, diff: diff ?? (S ? S.diff : 0), time: 0, gold: 180 + skillVal('gold'), lives: 20 + skillVal('def'), wave: 0, waveActive: false, queue: [], spawnT: 0, enemies: [], towers: [], proj: [], fx: [], over: false, won: false, autoT: FIRST_WAVE_DELAY, slowAll: 0, itemUsed: {}, hazards: [], planes: [] };
   let mi = Math.floor(Math.random() * MAPS.length);
   if (S.prevMap === mi) mi = (mi + 1 + Math.floor(Math.random() * (MAPS.length - 1))) % MAPS.length;
-  S.map = mi; setMap(mi);
+  S.map = mi; setMap(mi); focusStart();
   S.obst = buildObstacles(mi);
   occ = new Map(); build = null; sel = null; paused = false; obsView = null; if (typeof itemPlace !== 'undefined') itemPlace = null;
   document.getElementById('overlay').hidden = true;
@@ -1397,25 +1564,27 @@ function place(type, c, r) {
   const cost = TOWERS[type].cost;
   if (!canPlace(c, r) || S.gold < cost) return false;
   S.gold -= cost;
-  const t = { type, c, r, x: (c + .5) * T, y: (r + .5) * T, lv: 1, cd: 0, ang: -Math.PI / 2, invested: cost, kills: 0 };
+  const t = { type, c, r, x: (c + .5) * T, y: (r + .5) * T, lv: 1, cd: 0, ang: -Math.PI / 2, invested: cost, kills: 0, hp: 70, down: 0, hitT: 0, calm: 0, pop: .3 };
   S.towers.push(t); occ.set(c + ',' + r, t);
-  ring(t.x, t.y, 10, 34, TOWERS[type].color, .35);
+  ring(t.x, t.y, 10, 34, TOWERS[type].color, .35); SND.place();
   return true;
 }
 function upgrade(t) {
   if (!t || t.lv >= 3) return; const c = upCost(t); if (S.gold < c) return;
-  S.gold -= c; t.invested += c; t.lv++;
-  ring(t.x, t.y, 12, stats(t).range, '#e2b54a', .45);
+  S.gold -= c; t.invested += c; t.lv++; t.hp = towerMax(t); t.down = 0; t.pop = .4;
+  const col = t.lv >= 3 ? '#ffd24a' : '#d6e4f0';
+  ring(t.x, t.y, 12, stats(t).range, '#e2b54a', .45); ring(t.x, t.y, 8, 58, col, .55); sparks(t.x, t.y, col, 20);
+  floatText(t.x, t.y - 36, tr('레벨 업! Lv.{n}', { n: t.lv }), col); SND.up();
 }
 function sell(t) {
-  if (!t) return; S.gold += refund(t);
+  if (!t) return; S.gold += refund(t); SND.sell();
   floatText(t.x, t.y - 10, '+' + refund(t), '#e2b54a');
   S.towers = S.towers.filter(o => o !== t); occ.delete(t.c + ',' + t.r);
   if (sel === t) sel = null;
 }
 function startWave() {
   if (S.waveActive || S.over || S.wave >= MAX_WAVE) return;
-  S.wave++; S.queue = buildWave(S.wave); S.spawnT = 0; S.waveActive = true; S.autoT = -1;
+  S.wave++; S.queue = buildWave(S.wave); S.spawnT = 0; S.waveActive = true; S.autoT = -1; SND.wave();
 }
 
 // ---------- effects ----------
@@ -1438,9 +1607,9 @@ function jagged(points) {
 // ---------- simulation ----------
 function hurt(e, dmg, src) {
   if (!e.alive) return;
-  e.hp -= dmg; e.flash = .07;
+  e.hp -= dmg; e.flash = .07; if (src) SND.hit();
   if (e.hp <= 0) {
-    e.alive = false;
+    e.alive = false; SND.kill();
     const rw = ENEMIES[e.type].reward + Math.floor(S.wave / 4);
     S.gold += rw; if (src) src.kills++;
     floatText(e.x, e.y - 12, '+' + rw, '#e2b54a');
@@ -1454,7 +1623,16 @@ function spawn(type) {
   S.enemies.push({ type, hp, maxHp: hp, hpScale: scale, d: 0, x: p.x, y: p.y, alive: true, slowT: 0, slowF: 0, flash: 0 });
 }
 function slowDown(e, slow, dur) { if (e.slowT <= 0 || slow >= e.slowF) e.slowF = slow; e.slowT = Math.max(e.slowT, dur); }
+function hitTower(t, dmg) {
+  if (t.down > 0) return;
+  t.hp -= dmg; t.hitT = .2; t.calm = 3;
+  floatText(t.x, t.y - 22, '-' + Math.ceil(dmg), '#e65a4f'); sparks(t.x, t.y, '#e65a4f', 5); SND.thit();
+  if (t.hp <= 0) {
+    t.hp = 0; t.down = 6; ring(t.x, t.y, 8, 40, '#8a8f92', .5); floatText(t.x, t.y - 38, tr('고장!'), '#c9c2b4'); SND.tdown();
+  }
+}
 function fire(t, e, st) {
+  SND.shoot(t.type);
   const nx = t.x + Math.cos(t.ang) * 20, ny = t.y + Math.sin(t.ang) * 20;
   if (t.type === 'police' || t.type === 'fire' || t.type === 'tank' || t.type === 'secret1') {
     const k = { police: 'bullet', fire: 'drop', tank: 'shell', secret1: 'shell' }[t.type], sp = { police: 700, fire: 420, tank: 820, secret1: 760 }[t.type];
@@ -1501,14 +1679,40 @@ function update(dt) {
   for (const e of S.enemies) {
     if (!e.alive) continue;
     if (e.flash > 0) e.flash -= dt;
+    if (e.fireT > 0) e.fireT -= dt;
     if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
     e.d += espeed(e) * dt;
-    if (e.d >= PATH_LEN) { e.alive = false; S.lives -= ENEMIES[e.type].lives; ring(W - 14, PTS[PTS.length - 1].y, 6, 50, '#e65a4f', .5); continue; }
+    if (e.d >= PATH_LEN) { e.alive = false; S.lives -= ENEMIES[e.type].lives; SND.gate(); ring(W - 14, PTS[PTS.length - 1].y, 6, 50, '#e65a4f', .5); continue; }
     const p = posAt(e.d); e.x = p.x; e.y = p.y;
   }
   updateHazards(dt);
+  for (const e of S.enemies) {
+    const a = ATK[e.type]; if (!a || !e.alive || (e.slowT > 0 && e.slowF >= 1)) continue;
+    e.atkCd = (e.atkCd === undefined ? a.cd * (.4 + Math.random() * .6) : e.atkCd) - dt;
+    if (e.atkCd > 0) continue;
+    let tg = null, bd = (a.range * T) ** 2;
+    for (const t of S.towers) { if (t.down > 0) continue; const d = (t.x - e.x) ** 2 + (t.y - e.y) ** 2; if (d < bd) { bd = d; tg = t; } }
+    if (!tg) { e.atkCd = .3; continue; }
+    e.atkCd = a.cd; e.fireT = .15;
+    S.eproj.push({ x: e.x, y: e.y, tg, sp: 360, ang: 0, dmg: a.dmg * (1 + .03 * (S.wave - 1) + .08 * S.diff) });
+    SND.eshot();
+  }
+  for (const p of S.eproj) {
+    if (!S.towers.includes(p.tg)) { p.dead = true; continue; }
+    const dx = p.tg.x - p.x, dy = p.tg.y - p.y, dist = Math.hypot(dx, dy), step = p.sp * dt; p.ang = Math.atan2(dy, dx);
+    if (dist <= step + 6) { p.dead = true; hitTower(p.tg, p.dmg); } else { p.x += dx / dist * step; p.y += dy / dist * step; }
+  }
+  S.eproj = S.eproj.filter(p => !p.dead);
   for (const t of S.towers) {
     if (t.bump > 0) t.bump -= dt;
+    if (t.pop > 0) t.pop -= dt;
+    if (t.hitT > 0) t.hitT -= dt;
+    if (t.down > 0) {
+      t.down -= dt;
+      if (t.down <= 0) { t.down = 0; t.hp = Math.ceil(towerMax(t) * .5); ring(t.x, t.y, 6, 34, '#a5d46a', .4); floatText(t.x, t.y - 22, tr('수리 완료'), '#a5d46a'); SND.trep(); }
+      continue;
+    }
+    if (t.calm > 0) t.calm -= dt; else if (t.hp < towerMax(t)) t.hp = Math.min(towerMax(t), t.hp + towerMax(t) * .05 * dt);
     if (TOWERS[t.type].income) continue;
     t.cd -= dt; const st = stats(t), r2 = st.range * st.range;
     let best = null;
@@ -1550,7 +1754,7 @@ function update(dt) {
   if (S.waveActive && !S.queue.length && !S.enemies.length) {
     S.waveActive = false;
     const bonus = 20 + S.wave * 3; S.gold += bonus;
-    floatText(W / 2, H / 2, tr('웨이브 {w} 방어 · 보너스 +{b}', { w: S.wave, b: bonus }), '#e2b54a');
+    const vc = viewCenter(); floatText(vc.x, vc.y, tr('웨이브 {w} 방어 · 보너스 +{b}', { w: S.wave, b: bonus }), '#e2b54a'); SND.clear();
     S.fx[S.fx.length - 1].life = S.fx[S.fx.length - 1].max = 2;
     onWaveCleared();
     if (S.wave >= MAX_WAVE) { endGame(true); return; }
@@ -1560,7 +1764,7 @@ function update(dt) {
 }
 
 function endGame(won) {
-  S.over = true; S.won = won; build = null;
+  S.over = true; S.won = won; build = null; if (won) SND.win(); else SND.lose();
   const D = DIFFS[S.diff], rec = prog.rec[D.id] = prog.rec[D.id] || { plays: 0, clears: 0, best: null };
   rec.plays++;
   let earned = 0;
@@ -1583,6 +1787,7 @@ function endGame(won) {
 function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (ROT) { ctx.translate(H, 0); ctx.rotate(Math.PI / 2); }
+  const zm = zoomOf(); if (zm !== 1) { ctx.scale(zm, zm); ctx.translate(-cam.x, -cam.y); }
   ctx.drawImage(bg, 0, 0, W, H);
   const showRange = (x, y, r, color) => {
     if (!r) return;
@@ -1606,7 +1811,18 @@ function render() {
   for (const t of S.towers) {
     if (TS !== 1) { ctx.save(); ctx.translate(t.x, t.y); ctx.scale(TS, TS); ctx.translate(-t.x, -t.y); }
     drawTower(ctx, t.type, t.x, t.y, t.lv, t.ang, t);
+    if (t.down > 0) {
+      ctx.fillStyle = 'rgba(18, 20, 20, .6)'; rr(ctx, t.x - 26, t.y - 26, 52, 52, 6); ctx.fill();
+      ctx.strokeStyle = '#a5d46a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(t.x, t.y, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - t.down / 6)); ctx.stroke();
+      ctx.fillStyle = 'rgba(190, 190, 190, .5)'; for (let i = 0; i < 3; i++) { const k = ((performance.now() / 900 + i / 3) % 1); circle(ctx, t.x - 6 + i * 6 + Math.sin(k * 6) * 3, t.y - 8 - k * 20, 3 + k * 4); ctx.fill(); }
+    } else if (t.hitT > 0) { ctx.fillStyle = 'rgba(230, 90, 79,' + t.hitT * 1.6 + ')'; rr(ctx, t.x - 26, t.y - 26, 52, 52, 6); ctx.fill(); }
     if (TS !== 1) ctx.restore();
+  }
+  for (const t of S.towers) {
+    if (t.hp >= towerMax(t) && !(t.down > 0)) continue;
+    const p = Math.max(0, t.hp / towerMax(t));
+    ctx.fillStyle = 'rgba(0, 0, 0, .65)'; ctx.fillRect(t.x - 20, t.y - 32, 40, 5);
+    ctx.fillStyle = p > .5 ? '#a5d46a' : p > .25 ? '#e2b54a' : '#e65a4f'; ctx.fillRect(t.x - 20, t.y - 32, 40 * p, 5);
   }
 
   if (sel) { ctx.strokeStyle = '#e2b54a'; ctx.lineWidth = 2; rr(ctx, sel.x - 27, sel.y - 27, 54, 54, 10); ctx.stroke(); }
@@ -1618,7 +1834,7 @@ function render() {
   }
   for (const p of S.proj) {
     if (p.k === 'bullet' || p.k === 'drop' || p.k === 'shell') {
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang); if (p.src && p.src.lv > 1) { const ps = 1 + (p.src.lv - 1) * .3; ctx.scale(ps, ps); }
       if (p.k === 'bullet') { ctx.fillStyle = '#c9c2b4'; ctx.strokeStyle = '#4a453c'; ctx.lineWidth = 1; circle(ctx, 0, 0, 3); ctx.fill(); ctx.stroke(); }
       else if (p.k === 'drop') { ctx.fillStyle = 'rgba(155,214,90,.45)'; ctx.beginPath(); ctx.ellipse(-6, 0, 8, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b5ec78'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 4, 0, 0, Math.PI * 2); ctx.fill(); }
       else { ctx.strokeStyle = 'rgba(235,230,211,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(-5, 0); ctx.stroke(); ctx.fillStyle = '#a39c90'; ctx.strokeStyle = '#3f3a33'; ctx.lineWidth = 1.2; circle(ctx, 0, 0, 5); ctx.fill(); ctx.stroke(); }
@@ -1643,6 +1859,12 @@ function render() {
         ctx.fillStyle = '#26262b'; circle(ctx, p.x, hy, 5); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.3)'; circle(ctx, p.x - 1.5, hy - 1.5, 1.6); ctx.fill();
       }
     }
+  }
+  for (const p of S.eproj) {
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
+    ctx.fillStyle = 'rgba(230, 90, 79, .35)'; ctx.beginPath(); ctx.ellipse(-8, 0, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1c1c20'; ctx.strokeStyle = '#e65a4f'; ctx.lineWidth = 1.5; circle(ctx, 0, 0, 4.5); ctx.fill(); ctx.stroke();
+    ctx.restore();
   }
   for (const f of S.fx) {
     const a = Math.max(0, f.life / f.max);
@@ -1675,9 +1897,13 @@ function render() {
     if (ROT) { ctx.textAlign = 'center'; ctxText('fillText', tr('적은 여기서 옵니다 ↓'), 18, PTS[0].y); ctxText('fillText', tr('↓ 성문을 지키세요'), W - 70, PTS[PTS.length - 1].y); }
     else { ctx.fillText(tr('적은 여기서 옵니다'), 34, PTS[0].y - 34); ctx.textAlign = 'right'; ctx.fillText(tr('성문을 지키세요'), W - 34, PTS[PTS.length - 1].y - 60); }
   }
+  if (zm > 1 && S.wave === 0 && !S.waveActive && !paused) {
+    ctx.font = '500 ' + Math.round(13 / zm) + 'px "IBM Plex Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(235,230,211,.85)';
+    ctxText('fillText', tr('드래그해서 화면 이동'), cam.x + W / zm - 34 / zm, cam.y + H / zm / 2);
+  }
   if (paused && !S.over) {
     ctx.fillStyle = 'rgba(8,14,12,.5)'; ctx.fillRect(0, 0, W, H);
-    ctx.font = '400 44px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctxText('fillText', IS_EN ? 'Paused' : '일시정지', W / 2, H / 2 + 14);
+    const vc = viewCenter(); ctx.font = '400 ' + Math.round(44 / zm) + 'px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ebe6d3'; ctxText('fillText', IS_EN ? 'Paused' : '일시정지', vc.x, vc.y + 14 / zm);
   }
 }
 
@@ -1777,12 +2003,12 @@ function refreshUI() {
   } else if (sel) {
     const st = stats(sel), d = TOWERS[sel.type], max = sel.lv >= 3, c = max ? 0 : upCost(sel);
     const nx = max ? null : stats({ type: sel.type, lv: sel.lv + 1, buff: sel.buff });
-    key = 's' + S.towers.indexOf(sel) + (sel.buff || 1) + '|' + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c) + '|' + (sel.unread || 0);
+    key = 's' + S.towers.indexOf(sel) + (sel.buff || 1) + '|' + sel.lv + sel.kills + (sel.earned || 0) + (S.gold >= c) + '|' + (sel.unread || 0) + '|' + Math.floor(sel.hp / towerMax(sel) * 10) + (sel.down > 0);
     const up = (a, b) => nx ? ` <span class="up">→ ${b}</span>` : '';
     html = `<h3>${d.name} <span class="lv">Lv.${sel.lv}${max ? tr(' · 최대') : ''}</span></h3>
       <dl class="kv">${st.income ? `<dt>${tr('웨이브당 채굴')}</dt><dd>${st.income}${up(0, nx && nx.income)}</dd><dt>${tr('캐낸 금화')}</dt><dd>${sel.earned || 0}</dd>` : `<dt>${tr('피해')}</dt><dd>${fmt(st.dmg)}${up(0, nx && fmt(nx.dmg))}</dd><dt>${tr('사거리')}</dt><dd>${tr('{n}칸', { n: fmt(st.range / T) })}${up(0, nx && fmt(nx.range / T))}</dd><dt>${tr('공격 간격')}</dt><dd>${st.rate.toFixed(2)}${tr('초')}${up(0, nx && nx.rate.toFixed(2))}</dd>
       ${st.slow ? `<dt>${tr('둔화')}</dt><dd>${Math.round(st.slow * 100)}%${up(0, nx && Math.round(nx.slow * 100) + '%')}</dd>` : ''}${st.freeze ? `<dt>${tr('정지')}</dt><dd>${st.freeze.toFixed(1)}${tr('초')}${up(0, nx && nx.freeze.toFixed(1) + tr('초'))}</dd>` : ''}${st.knock ? `<dt>${tr('밀쳐내기')}</dt><dd>${tr('{n}칸', { n: fmt(st.knock / T) })}${up(0, nx && fmt(nx.knock / T))}</dd>` : ''}
-      <dt>${tr('처치')}</dt><dd>${sel.kills}</dd>`}<dt>${tr('들인 금화')}</dt><dd>${sel.invested}</dd>${sel.buff > 1 ? `<dt>${tr('퀴즈 보너스')}</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
+      <dt>${tr('처치')}</dt><dd>${sel.kills}</dd>`}<dt>${tr('들인 금화')}</dt><dd>${sel.invested}</dd><dt>${tr('내구도')}</dt><dd>${Math.ceil(sel.hp)}/${towerMax(sel)}${sel.down > 0 ? ' ⚠' : ''}</dd>${sel.buff > 1 ? `<dt>${tr('퀴즈 보너스')}</dt><dd>+${Math.round((sel.buff - 1) * 100)}%</dd>` : ''}</dl>
       <div class="row"><button class="btn primary grow" type="button" data-act="up" ${max || S.gold < c ? 'disabled' : ''}>${max ? tr('최대 강화') : tr('강화') + ' <span class="mono">' + c + '</span>'}</button><button class="btn danger" type="button" data-act="sell" title="${tr('설치비와 강화비 합계의 {p}%를 돌려받습니다', { p: Math.round(sellRate() * 100) })}">${tr('판매')} <span class="mono">+${refund(sel)}</span></button></div>
       <button class="btn" type="button" data-act="guide">${tr('📖 특성 보기')}</button>`;
   } else {
@@ -1928,15 +2154,31 @@ $('garage').addEventListener('click', e => {
 
 function tileAt(ev) {
   const r = cv.getBoundingClientRect();
-  const lx = (ev.clientX - r.left) / r.width * (ROT ? H : W), ly = (ev.clientY - r.top) / r.height * (ROT ? W : H);
-  const x = ROT ? ly : lx, y = ROT ? H - lx : ly;
+  const lx = (ev.clientX - r.left) / r.width * (ROT ? H : W), ly = (ev.clientY - r.top) / r.height * (ROT ? W : H), z = zoomOf();
+  const x = ROT ? cam.x + ly / z : lx, y = ROT ? cam.y + (H - lx) / z : ly;
   const c = Math.floor(x / T), row = Math.floor(y / T);
   return c >= 0 && c < COLS && row >= 0 && row < ROWS ? { c, r: row, x, y } : null;
 }
-cv.addEventListener('pointermove', e => { hover = tileAt(e); });
-cv.addEventListener('pointerdown', e => { hover = tileAt(e); });
+// 확대한 화면(휴대폰)에서는 손가락으로 끌어 옮깁니다. 조금(9px) 넘게 움직이면 끌기, 그보다 적으면 탭으로 칩니다.
+let drag = null, dragMoved = false;
+cv.addEventListener('pointerdown', e => {
+  hover = tileAt(e);
+  if (ROT && zoomOf() > 1 && e.isPrimary) { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }; dragMoved = false; }
+});
+cv.addEventListener('pointermove', e => {
+  hover = tileAt(e);
+  if (!drag) return;
+  if (!dragMoved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 9) return;
+  dragMoved = true;
+  const k = H / cv.getBoundingClientRect().width, z = zoomOf();
+  cam.y = drag.cy + (e.clientX - drag.x) * k / z; cam.x = drag.cx - (e.clientY - drag.y) * k / z; clampCam();
+});
+const endDrag = () => { drag = null; };
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+document.getElementById('zoomBtn').addEventListener('click', () => { cam.zoom = !cam.zoom; focusStart(); });
 cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hover = null; });
 cv.addEventListener('click', e => {
+  if (dragMoved) { dragMoved = false; return; }
   lockView = null;
   if (S.over) return;
   const h = tileAt(e); if (!h) return;
@@ -2051,6 +2293,7 @@ const TIPS = [
   '빙결총은 적을 잠깐 멈춰 세워요. 대포 범위 공격과 같이 쓰면 좋아요.',
   '패시브 상점의 공격력·공격 속도는 모든 무기에 적용돼요.',
   '수다 떨다 숨은 말을 꺼내면 퀴즈가 나와요. 게임 중에 맞히면 보상을 받아요.',
+  '검은 차량도 무기를 쏴요! 내구도가 다 닳으면 무기가 잠깐 고장 나지만 사라지진 않고 곧 고쳐져요. 강화하면 내구도가 가득 차요.',
 ];
 function statusLine() {
   if (inLobby) return tr('지금은 로비예요. 업적 포인트는 {a} AP 있어요. 난이도를 골라 출동해 보세요!', { a: prog.ap });
@@ -2395,7 +2638,8 @@ if (IS_EN) {
     'You only earn AP if you clear within the time limit. Don\'t wait between waves.',
     'The Freeze Gun stops enemies for a moment. It pairs well with area-damage cannons.',
     'Attack power and attack speed in the passive shop apply to every weapon.',
-    'Keep chatting and say a hidden word to get a quiz. Answer it during a game for a reward.');
+    'Keep chatting and say a hidden word to get a quiz. Answer it during a game for a reward.',
+    'Black cars shoot back! A weapon whose durability runs out breaks for a moment, but it never disappears and gets repaired soon. Upgrading refills its durability.');
 
   Object.assign(YOU, { haru: 'you', doyun: 'Commander' });
   Object.assign(YOU_NAMED, { haru: n => n, doyun: n => `Commander ${n}` });
@@ -2582,19 +2826,7 @@ function drawQuiz() {
   return { q, a, options: [a, ...wrong].sort(() => Math.random() - .5) };
 }
 
-let audio = null;
-function ding() {
-  try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    const now = audio.currentTime;
-    [[880, 0], [1320, .09]].forEach(([f, d]) => {
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.type = 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0, now + d); g.gain.linearRampToValueAtTime(.08, now + d + .01); g.gain.exponentialRampToValueAtTime(.001, now + d + .22);
-      o.connect(g).connect(audio.destination); o.start(now + d); o.stop(now + d + .25);
-    });
-  } catch (e) { /* sound is optional */ }
-}
+function ding() { SND.ding(); }
 
 // 페르소나 얼굴: 60단위 공간에 그립니다.
 function drawPersona(g, id) {
@@ -2882,7 +3114,7 @@ function useItem(k) {
     const P = curP(); if (!P || affOf(P) < ITEM_COST) return;
     prog.aff[P.id] = Math.round((affOf(P) - ITEM_COST) * 10) / 10; saveProg(); updateAffUI();
     S.planes.push({ d: 0, cd: 0, x: PTS[0].x, y: PTS[0].y, ang: 0 });
-    floatText(80, PTS[0].y - 24, tr('✈️ 출격! -💗{c}', { c: ITEM_COST }), '#7fb2e5');
+    floatText(80, PTS[0].y - 24, tr('✈️ 출격! -💗{c}', { c: ITEM_COST }), '#7fb2e5'); SND.item();
     panelKey = ''; return;
   }
   if (ITEMS[k].consumable) {
@@ -2905,7 +3137,7 @@ function placeHazard(c, r) {
   prog.aff[P.id] = Math.round((affOf(P) - ITEM_COST) * 10) / 10; saveProg(); updateAffUI();
   const x = (c + .5) * T, y = (r + .5) * T;
   S.hazards.push({ type: itemPlace, c, r, x, y, life: HAZARD_LIFE });
-  ring(x, y, 6, 36, ITEMS[itemPlace].color, .5); floatText(x, y - 24, '-💗' + ITEM_COST, '#ff8fb3');
+  ring(x, y, 6, 36, ITEMS[itemPlace].color, .5); floatText(x, y - 24, '-💗' + ITEM_COST, '#ff8fb3'); SND.item();
   itemPlace = null; panelKey = '';
   return true;
 }
@@ -3057,6 +3289,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (!paused && !inLobby && !guideOpen) { for (let i = 0; i < speed; i++) update(dt); time += dt; }
+  SND.mood = inLobby || S.over ? 0 : S.waveActive ? 2 : 1;
   updateFab();
   render(); refreshUI();
   requestAnimationFrame(frame);
